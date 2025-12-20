@@ -1141,8 +1141,10 @@ function calculateAvg(list, count, mean=false) {
 
 // --- Interaction Logic with configurable Hold Time ---
 function handleStart(e) {
-    // BT 모드일 때: 인스펙션 모드가 아니면 키보드 입력 무시 (기존 로직)
-    // 수정: BT + 인스펙션 모드면 키보드 허용 (인스펙션 시작용)
+    // [FIX] Ignore touches on interactive elements like badges or buttons
+    // This allows clicking on stats/settings without triggering the timer
+    if (e.target.closest('.avg-badge') || e.target.closest('button') || e.target.closest('.tools-dropdown')) return;
+
     if (isBtConnected && !isInspectionMode) return; 
     
     if(e && e.cancelable) e.preventDefault();
@@ -1259,7 +1261,18 @@ window.addEventListener('keyup', e => { if(e.code==='Space' && !editingSessionId
 const interactiveArea = document.getElementById('timerInteractiveArea');
 interactiveArea.addEventListener('touchstart', handleStart, { passive: false });
 interactiveArea.addEventListener('touchend', handleEnd, { passive: false });
-window.openSettings = () => { document.getElementById('settingsOverlay').classList.add('active'); setTimeout(()=>document.getElementById('settingsModal').classList.remove('scale-95','opacity-0'), 10); };
+
+// [UPDATED] Toggle Settings: Acts as open/close toggle
+window.openSettings = () => { 
+    const overlay = document.getElementById('settingsOverlay');
+    if (overlay.classList.contains('active')) {
+        closeSettings();
+    } else {
+        overlay.classList.add('active'); 
+        setTimeout(()=>document.getElementById('settingsModal').classList.remove('scale-95','opacity-0'), 10); 
+    }
+};
+
 window.closeSettings = () => { document.getElementById('settingsModal').classList.add('scale-95','opacity-0'); setTimeout(()=>document.getElementById('settingsOverlay').classList.remove('active'), 200); saveData(); };
 window.handleOutsideSettingsClick = (e) => { if(e.target === document.getElementById('settingsOverlay')) closeSettings(); };
 window.showSolveDetails = (id) => { let s = solves.find(x=>x.id===id); if(!s) return; selectedSolveId = id; document.getElementById('modalTime').innerText = s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time); document.getElementById('modalEvent').innerText = s.event; document.getElementById('modalScramble').innerText = s.scramble; document.getElementById('modalOverlay').classList.add('active'); };
