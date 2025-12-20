@@ -17,13 +17,23 @@ let holdDuration = 300; // ms
 let wakeLock = null;
 let isWakeLockEnabled = false;
 
+// Inspection Logic Vars
+let isInspectionMode = false;
+let inspectionState = 'none'; // 'none', 'inspecting', 'holding'
+let inspectionStartTime = 0;
+let inspectionInterval = null;
+let inspectionPenalty = null; // null, '+2', 'DNF'
+let hasSpoken8 = false;
+let hasSpoken12 = false;
+
 // Update Log Configuration
-const APP_VERSION = '1.0.2'; // Change this to trigger update modal for users
+const APP_VERSION = '1.1.0'; 
 const UPDATE_LOGS = [
-    "v1.0.2 업데이트 완료!",
-    "시간 표시 방식 변경: 9.497초 → 9.49초 (소수점 3째자리 버림 적용)",
-    "업데이트 내역 팝업 기능 추가",
-    "설정에서 'Precision'이 .00으로 되어 있어야 절삭이 적용됩니다."
+    "v1.1.0 업데이트: WCA 인스펙션 모드 추가!",
+    "인스펙션 기능: 설정에서 켜면 15초 카운트다운 진행",
+    "음성 안내: 8초('Eight'), 12초('Twelve') 자동 음성",
+    "자동 페널티: 15~17초 시작 시 +2, 17초 초과 시 DNF",
+    "인스펙션 모드 활성화 시 Hold 시간 자동 단축 (즉시 시작)"
 ];
 
 // Lazy Loading Vars
@@ -59,6 +69,7 @@ const darkModeToggle = document.getElementById('darkModeToggle');
 const wakeLockToggle = document.getElementById('wakeLockToggle');
 const holdDurationSlider = document.getElementById('holdDurationSlider');
 const holdDurationValue = document.getElementById('holdDurationValue');
+const inspectionToggle = document.getElementById('inspectionToggle');
 
 const configs = {
     '333': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'standard' },
@@ -101,6 +112,74 @@ window.closeUpdateLog = () => {
     localStorage.setItem('appVersion', APP_VERSION);
 };
 
+// --- Inspection Logic ---
+function toggleInspection(checkbox) {
+    isInspectionMode = checkbox.checked;
+    
+    // Force set hold duration to ~0 if inspection is ON
+    if (isInspectionMode) {
+        updateHoldDuration(0.01); // Basically instant
+        holdDurationSlider.value = 0.01;
+        holdDurationSlider.disabled = true;
+        document.getElementById('holdDurationContainer').classList.add('opacity-50', 'pointer-events-none');
+    } else {
+        // Restore default or previous (let's set to 0.3 default for now to be safe)
+        updateHoldDuration(0.3);
+        holdDurationSlider.value = 0.3;
+        holdDurationSlider.disabled = false;
+        document.getElementById('holdDurationContainer').classList.remove('opacity-50', 'pointer-events-none');
+    }
+    
+    saveData();
+}
+
+function startInspection() {
+    inspectionState = 'inspecting';
+    inspectionStartTime = Date.now();
+    inspectionPenalty = null;
+    hasSpoken8 = false;
+    hasSpoken12 = false;
+    
+    timerEl.classList.remove('text-ready');
+    timerEl.style.color = '#ef4444'; // Red color for inspection countdown
+    statusHint.innerText = "Inspection";
+
+    if(inspectionInterval) clearInterval(inspectionInterval);
+    inspectionInterval = setInterval(() => {
+        const elapsed = (Date.now() - inspectionStartTime) / 1000;
+        const remaining = 15 - elapsed;
+        
+        if (remaining > 0) {
+            timerEl.innerText = Math.ceil(remaining);
+        } else if (remaining > -2) {
+            timerEl.innerText = "+2";
+            inspectionPenalty = '+2';
+        } else {
+            timerEl.innerText = "DNF";
+            inspectionPenalty = 'DNF';
+        }
+
+        // TTS
+        if (elapsed >= 8 && !hasSpoken8) {
+            speak("Eight seconds");
+            hasSpoken8 = true;
+        }
+        if (elapsed >= 12 && !hasSpoken12) {
+            speak("Twelve seconds");
+            hasSpoken12 = true;
+        }
+    }, 100);
+}
+
+function speak(text) {
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 1.2;
+        window.speechSynthesis.speak(utterance);
+    }
+}
+
 // --- Dark Mode ---
 function toggleDarkMode(checkbox) {
     const isDark = checkbox.checked;
@@ -142,7 +221,7 @@ document.addEventListener('visibilitychange', async () => {
 // --- Hold Duration ---
 function updateHoldDuration(val) {
     holdDuration = parseFloat(val) * 1000;
-    holdDurationValue.innerText = val + "s";
+    holdDurationValue.innerText = val < 0.1 ? "Instant" : val + "s";
     saveData();
 }
 
@@ -280,13 +359,18 @@ function onBTDisconnected() {
 }
 
 function startTimer() {
+    if(inspectionInterval) clearInterval(inspectionInterval); // Stop inspection countdown
+    inspectionState = 'none';
+    
     startTime = Date.now(); 
     isRunning = true;
     timerInterval = setInterval(()=> {
         timerEl.innerText = formatTime(Date.now()-startTime);
     }, 10);
+    
+    // Visual Reset
+    timerEl.style.color = ''; // Remove inspection red
     statusHint.innerText = "Timing..."; 
-    // Use the CSS class for running state to support dark mode automatically
     timerEl.classList.add('text-running');
     timerEl.classList.remove('text-ready');
 }
@@ -295,24 +379,37 @@ function stopTimer(forcedTime = null) {
     clearInterval(timerInterval);
     let elapsed = forcedTime !== null ? forcedTime : (Date.now() - startTime);
     
-    if (elapsed > 10) {
+    let finalPenalty = inspectionPenalty; // Apply inspection penalty if any
+
+    if (elapsed > 10 || finalPenalty === 'DNF') {
         solves.unshift({
             id: Date.now(), 
             time: elapsed, 
             scramble: currentScramble, 
             event: currentEvent, 
             sessionId: getCurrentSessionId(), 
-            penalty: null,
+            penalty: finalPenalty,
             date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, "")
         });
-        timerEl.innerText = formatTime(elapsed);
+        
+        if (finalPenalty === 'DNF') {
+            timerEl.innerText = "DNF";
+        } else {
+            let displayTime = formatTime(elapsed);
+            if (finalPenalty === '+2') {
+                displayTime = formatTime(elapsed + 2000) + "+";
+            }
+            timerEl.innerText = displayTime;
+        }
     }
     
     isRunning = isReady = false; 
+    inspectionState = 'none'; // Reset state
     updateUI(); 
     generateScramble();
-    statusHint.innerText = isBtConnected ? "Ready (Bluetooth)" : "Hold to Ready"; 
+    statusHint.innerText = isBtConnected ? "Ready (Bluetooth)" : (isInspectionMode ? "Start Inspection" : "Hold to Ready"); 
     timerEl.classList.remove('text-running', 'text-ready'); 
+    timerEl.style.color = ''; // Reset colors
     saveData();
 }
 
@@ -341,7 +438,14 @@ function togglePenalty(p) {
     if (!currentList.length) return;
     const targetSolve = currentList[0];
     targetSolve.penalty = (targetSolve.penalty===p)?null:p;
-    timerEl.innerText = targetSolve.penalty==='DNF'?'DNF':formatTime(targetSolve.penalty==='+2'?targetSolve.time+2000:targetSolve.time) + (targetSolve.penalty==='+2'?'+':'');
+    
+    if (targetSolve.penalty === 'DNF') {
+        timerEl.innerText = 'DNF';
+    } else {
+        const t = targetSolve.time + (targetSolve.penalty === '+2' ? 2000 : 0);
+        timerEl.innerText = formatTime(t) + (targetSolve.penalty === '+2' ? '+' : '');
+    }
+    
     updateUI(); updatePenaltyBtns(targetSolve); saveData();
 }
 
@@ -350,7 +454,15 @@ function exportData() {
     const data = {
         solves: solves,
         sessions: sessions,
-        settings: { precision, isAo5Mode, currentEvent, holdDuration, isDarkMode: document.documentElement.classList.contains('dark'), isWakeLockEnabled }
+        settings: { 
+            precision, 
+            isAo5Mode, 
+            currentEvent, 
+            holdDuration, 
+            isDarkMode: document.documentElement.classList.contains('dark'), 
+            isWakeLockEnabled,
+            isInspectionMode // Save inspection setting
+        }
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -382,13 +494,21 @@ function importData(event) {
                     holdDuration = data.settings.holdDuration || 300;
                     isWakeLockEnabled = data.settings.isWakeLockEnabled || false;
                     const isDark = data.settings.isDarkMode || false;
+                    isInspectionMode = data.settings.isInspectionMode || false;
                     
                     precisionToggle.checked = (precision === 3);
                     avgModeToggle.checked = isAo5Mode;
                     darkModeToggle.checked = isDark;
                     wakeLockToggle.checked = isWakeLockEnabled;
-                    holdDurationSlider.value = holdDuration / 1000;
-                    updateHoldDuration(holdDurationSlider.value);
+                    inspectionToggle.checked = isInspectionMode;
+                    
+                    // Restore hold duration UI based on inspection
+                    toggleInspection(inspectionToggle);
+                    if (!isInspectionMode) {
+                        holdDurationSlider.value = holdDuration / 1000;
+                        updateHoldDuration(holdDurationSlider.value);
+                    }
+
                     document.documentElement.classList.toggle('dark', isDark);
                     if(isWakeLockEnabled) requestWakeLock();
                 }
@@ -412,7 +532,8 @@ function saveData() {
             currentEvent, 
             holdDuration,
             isDarkMode: document.documentElement.classList.contains('dark'),
-            isWakeLockEnabled
+            isWakeLockEnabled,
+            isInspectionMode
         }
     };
     localStorage.setItem('cubeTimerData_v5', JSON.stringify(data));
@@ -432,13 +553,22 @@ function loadData() {
                 holdDuration = data.settings.holdDuration || 300;
                 const isDark = data.settings.isDarkMode || false;
                 isWakeLockEnabled = data.settings.isWakeLockEnabled || false;
+                isInspectionMode = data.settings.isInspectionMode || false;
 
                 precisionToggle.checked = (precision === 3);
                 avgModeToggle.checked = isAo5Mode;
                 darkModeToggle.checked = isDark;
                 wakeLockToggle.checked = isWakeLockEnabled;
-                holdDurationSlider.value = holdDuration / 1000;
-                holdDurationValue.innerText = holdDurationSlider.value + "s";
+                inspectionToggle.checked = isInspectionMode;
+                
+                // Initialize UI state
+                if (isInspectionMode) {
+                    toggleInspection(inspectionToggle);
+                } else {
+                    holdDurationSlider.value = holdDuration / 1000;
+                    holdDurationValue.innerText = holdDurationSlider.value + "s";
+                }
+
                 document.documentElement.classList.toggle('dark', isDark);
                 if(isWakeLockEnabled) requestWakeLock();
 
@@ -448,6 +578,11 @@ function loadData() {
         } catch (e) { console.error("Load failed", e); }
     }
     initSessionIfNeeded(currentEvent);
+    
+    // Update status hint based on mode
+    if (!isBtConnected) {
+        statusHint.innerText = isInspectionMode ? "Start Inspection" : "Hold to Ready";
+    }
 }
 
 function initSessionIfNeeded(eventId) {
@@ -885,9 +1020,6 @@ window.showExtendedStats = () => {
     const ao50 = calculateAvg(filtered, 50);
     const ao100 = calculateAvg(filtered, 100);
     
-    // Best Avgs (Simple sliding window calculation could be added here for perfection, keeping simple current avg for now)
-    // Ideally we iterate to find best. Let's do simple Current Avg for now to keep code light.
-    
     const content = document.getElementById('statsContent');
     content.innerHTML = `
         <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
@@ -911,14 +1043,11 @@ function calculateAvg(list, count, mean=false) {
     if(list.length < count) return "-";
     let slice = list.slice(0, count); let dnfC = slice.filter(s=>s.penalty==='DNF').length;
     
-    // Trim logic: Best 5% and Worst 5% removal for large averages (standard WCA is usually just 1 best 1 worst for Ao5, Ao12)
-    // For Ao5: remove 1 best, 1 worst.
-    // For Ao12: remove 1 best, 1 worst.
-    // For Ao100: remove 5 best, 5 worst.
+    // Trim logic: Best 5% and Worst 5% removal for large averages
     let removeCount = Math.ceil(count * 0.05); // 5%
     if (count <= 12) removeCount = 1; 
 
-    if(dnfC >= removeCount + (mean?0:1)) return "DNF"; // Rough DNF logic
+    if(dnfC >= removeCount + (mean?0:1)) return "DNF"; 
 
     let nums = slice.map(s => s.penalty==='DNF'?Infinity:(s.penalty==='+2'?s.time+2000:s.time));
     if(mean) return (nums.reduce((a,b)=>a+b,0)/count/1000).toFixed(precision);
@@ -936,6 +1065,26 @@ function handleStart(e) {
     if(e && e.cancelable) e.preventDefault();
     if(isManualMode || isRunning) { if(isRunning) stopTimer(); return; }
     
+    // Inspection Logic Handling
+    if (isInspectionMode && inspectionState === 'none') {
+        // Space pressed in Idle with inspection ON: Do nothing (wait for release to start inspection)
+        return;
+    }
+
+    if (isInspectionMode && inspectionState === 'inspecting') {
+        // Pressed during inspection -> Ready to solve
+        timerEl.style.color = '#ef4444'; 
+        timerEl.classList.add('holding-status');
+        holdTimer = setTimeout(()=> { 
+            isReady=true; 
+            timerEl.style.color = '#10b981'; 
+            timerEl.classList.replace('holding-status','ready-to-start'); 
+            statusHint.innerText="Ready!"; 
+        }, holdDuration); 
+        return;
+    }
+
+    // Standard Logic
     timerEl.style.color = '#ef4444'; 
     timerEl.classList.add('holding-status');
     
@@ -946,28 +1095,42 @@ function handleStart(e) {
         statusHint.innerText="Ready!"; 
     }, holdDuration); 
 }
+
 function handleEnd(e) {
     if (isBtConnected) return; 
     if(e && e.cancelable) e.preventDefault();
     clearTimeout(holdTimer);
-    if(!isRunning && isReady) startTimer();
-    else { 
+
+    if (isManualMode) return;
+
+    // Inspection Mode: Start Countdown on Release if Idle
+    if (isInspectionMode && !isRunning && inspectionState === 'none') {
+        startInspection();
+        return;
+    }
+
+    if(!isRunning && isReady) {
+        startTimer();
+    } else { 
         // Reset color logic for dark mode
-        const isDark = document.documentElement.classList.contains('dark');
         timerEl.style.color = ''; 
-        // We rely on CSS class handling or remove inline style to revert to class-based color
-        // Removing inline style allows CSS to take over (text-slate-800 or dark:text-slate-100)
         
         timerEl.classList.remove('holding-status','ready-to-start'); 
         isReady=false; 
-        statusHint.innerText="Hold to Ready"; 
+        // If inspecting, don't reset to "Hold to Ready"
+        if (!isInspectionMode || inspectionState === 'none') {
+            statusHint.innerText= isInspectionMode ? "Start Inspection" : "Hold to Ready";
+        } else {
+            // Returned to inspecting state without starting
+            timerEl.style.color = '#ef4444'; 
+        }
     }
 }
 
 window.openSessionModal = () => { document.getElementById('sessionOverlay').classList.add('active'); renderSessionList(); };
 window.closeSessionModal = () => { document.getElementById('sessionOverlay').classList.remove('active'); document.getElementById('newSessionName').value = ""; editingSessionId = null; };
 
-// ... (Session Management Functions: renderSessionList, editSessionName, saveSessionName, createNewSession, switchSession, deleteSession - kept same logic, just HTML template updated implicitly by not changing logic, but renderSessionList needs template update for Dark Mode) ...
+// ... (Session Management Functions - Logic Preserved) ...
 
 function renderSessionList() {
     const listContainer = document.getElementById('sessionList');
@@ -983,7 +1146,7 @@ function renderSessionList() {
     document.getElementById('sessionCreateForm').classList.toggle('hidden', eventSessions.length >= 10);
 }
 
-// ... (Remaining window functions: editSessionName, saveSessionName, createNewSession, switchSession, deleteSession, openAvgShare, openSingleShare, closeAvgShare, copyShareText, eventListeners, showSolveDetails, closeModal, useThisScramble, document.getElementById('clearHistoryBtn').onclick - All logic preserved) ...
+// ... (Remaining window functions - Logic Preserved) ...
 window.editSessionName = (id) => { editingSessionId = id; renderSessionList(); };
 window.saveSessionName = (id) => { const input = document.getElementById('editSessionInput'); if (!input) return; const newName = input.value.trim(); if (newName) { const s = sessions[currentEvent].find(x => x.id === id); if (s) s.name = newName; } editingSessionId = null; renderSessionList(); updateUI(); saveData(); };
 window.createNewSession = () => { const nameInput = document.getElementById('newSessionName'); const name = nameInput.value.trim() || `Session ${sessions[currentEvent].length + 1}`; if (sessions[currentEvent].length >= 10) return; sessions[currentEvent].forEach(s => s.isActive = false); sessions[currentEvent].push({ id: Date.now(), name: name, isActive: true }); nameInput.value = ""; renderSessionList(); updateUI(); saveData(); timerEl.innerText = (0).toFixed(precision); resetPenalty(); };
