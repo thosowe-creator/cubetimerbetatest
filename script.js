@@ -25,15 +25,16 @@ let inspectionInterval = null;
 let inspectionPenalty = null; // null, '+2', 'DNF'
 let hasSpoken8 = false;
 let hasSpoken12 = false;
+let lastStopTimestamp = 0; // 버그 수정: 타이머 멈춘 시각 기록 (쿨다운용)
 
 // Update Log Configuration
-const APP_VERSION = '1.1.0'; 
+const APP_VERSION = '1.2.0'; 
 const UPDATE_LOGS = [
-    "v1.1.0 업데이트: WCA 인스펙션 모드 추가!",
-    "인스펙션 기능: 설정에서 켜면 15초 카운트다운 진행",
-    "음성 안내: 8초('Eight'), 12초('Twelve') 자동 음성",
-    "자동 페널티: 15~17초 시작 시 +2, 17초 초과 시 DNF",
-    "인스펙션 모드 활성화 시 Hold 시간 자동 단축 (즉시 시작)"
+    "v1.2.0 긴급 수정 및 기능 개선",
+    "버그 수정: 솔브 후 스페이스바를 뗄 때 인스펙션이 바로 재시작되는 문제 해결",
+    "기능 개선: 간 타이머 연결 시에도 스페이스바로 인스펙션 카운트다운 사용 가능",
+    "로직 변경: 간 타이머 모드 시 키보드로는 절대 타이머가 시작되지 않음 (오직 하드웨어로만 시작)",
+    "연동 강화: 간 타이머 시작 시 인스펙션 시간 초과 페널티(+2, DNF) 자동 적용"
 ];
 
 // Lazy Loading Vars
@@ -123,7 +124,6 @@ function toggleInspection(checkbox) {
         holdDurationSlider.disabled = true;
         document.getElementById('holdDurationContainer').classList.add('opacity-50', 'pointer-events-none');
     } else {
-        // Restore default or previous (let's set to 0.3 default for now to be safe)
         updateHoldDuration(0.3);
         holdDurationSlider.value = 0.3;
         holdDurationSlider.disabled = false;
@@ -171,6 +171,19 @@ function startInspection() {
     }, 100);
 }
 
+function stopInspection() {
+    if(inspectionInterval) clearInterval(inspectionInterval);
+    inspectionState = 'none';
+    timerEl.style.color = '';
+    // Calculate penalty one last time to be precise
+    if (isInspectionMode && inspectionStartTime > 0) {
+        const elapsed = (Date.now() - inspectionStartTime) / 1000;
+        if (elapsed > 17) inspectionPenalty = 'DNF';
+        else if (elapsed > 15) inspectionPenalty = '+2';
+        else inspectionPenalty = null;
+    }
+}
+
 function speak(text) {
     if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
@@ -211,14 +224,12 @@ async function toggleWakeLock(checkbox) {
     saveData();
 }
 
-// Re-request wake lock when visibility changes
 document.addEventListener('visibilitychange', async () => {
     if (wakeLock !== null && document.visibilityState === 'visible' && isWakeLockEnabled) {
         await requestWakeLock();
     }
 });
 
-// --- Hold Duration ---
 function updateHoldDuration(val) {
     holdDuration = parseFloat(val) * 1000;
     holdDurationValue.innerText = val < 0.1 ? "Instant" : val + "s";
@@ -297,15 +308,26 @@ function handleGanBTData(event) {
 
     if (state !== lastBtState) {
         if (state === 6) { // HANDS_ON
-            isReady = false;
-            timerEl.classList.add('text-ready'); 
-            statusHint.innerText = "Ready!";
+            // If inspecting, do not reset ready state (user puts hands on timer during inspection)
+            if (!isInspectionMode) {
+                isReady = false;
+                timerEl.classList.add('text-ready'); 
+                statusHint.innerText = "Ready!";
+            }
         } else if (state === 1) { // GET_SET
-        } else if (state === 2) { // HANDS_OFF
-             timerEl.classList.remove('text-ready', 'text-running');
-             statusHint.innerText = "Timer Ready (BT)";
+        } else if (state === 2) { // HANDS_OFF (Just released)
+             // If inspecting, this is where we start the solve and end inspection
+             if (!isInspectionMode) {
+                 timerEl.classList.remove('text-ready', 'text-running');
+                 statusHint.innerText = "Timer Ready (BT)";
+             }
         } else if (state === 3) { // RUNNING
             if (!isRunning) {
+                // If inspection mode was active, stop it and check penalty
+                if (isInspectionMode && inspectionState === 'inspecting') {
+                    stopInspection();
+                }
+
                 startTime = Date.now();
                 isRunning = true;
                 if(timerInterval) clearInterval(timerInterval);
@@ -359,7 +381,7 @@ function onBTDisconnected() {
 }
 
 function startTimer() {
-    if(inspectionInterval) clearInterval(inspectionInterval); // Stop inspection countdown
+    if(inspectionInterval) clearInterval(inspectionInterval); 
     inspectionState = 'none';
     
     startTime = Date.now(); 
@@ -368,8 +390,7 @@ function startTimer() {
         timerEl.innerText = formatTime(Date.now()-startTime);
     }, 10);
     
-    // Visual Reset
-    timerEl.style.color = ''; // Remove inspection red
+    timerEl.style.color = ''; 
     statusHint.innerText = "Timing..."; 
     timerEl.classList.add('text-running');
     timerEl.classList.remove('text-ready');
@@ -378,8 +399,9 @@ function startTimer() {
 function stopTimer(forcedTime = null) {
     clearInterval(timerInterval);
     let elapsed = forcedTime !== null ? forcedTime : (Date.now() - startTime);
+    lastStopTimestamp = Date.now(); // Record stop time to prevent immediate inspection restart
     
-    let finalPenalty = inspectionPenalty; // Apply inspection penalty if any
+    let finalPenalty = inspectionPenalty; 
 
     if (elapsed > 10 || finalPenalty === 'DNF') {
         solves.unshift({
@@ -404,12 +426,14 @@ function stopTimer(forcedTime = null) {
     }
     
     isRunning = isReady = false; 
-    inspectionState = 'none'; // Reset state
+    inspectionState = 'none'; 
+    inspectionPenalty = null; // Reset penalty for next solve
+    
     updateUI(); 
     generateScramble();
     statusHint.innerText = isBtConnected ? "Ready (Bluetooth)" : (isInspectionMode ? "Start Inspection" : "Hold to Ready"); 
     timerEl.classList.remove('text-running', 'text-ready'); 
-    timerEl.style.color = ''; // Reset colors
+    timerEl.style.color = ''; 
     saveData();
 }
 
@@ -461,7 +485,7 @@ function exportData() {
             holdDuration, 
             isDarkMode: document.documentElement.classList.contains('dark'), 
             isWakeLockEnabled,
-            isInspectionMode // Save inspection setting
+            isInspectionMode 
         }
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -502,7 +526,6 @@ function importData(event) {
                     wakeLockToggle.checked = isWakeLockEnabled;
                     inspectionToggle.checked = isInspectionMode;
                     
-                    // Restore hold duration UI based on inspection
                     toggleInspection(inspectionToggle);
                     if (!isInspectionMode) {
                         holdDurationSlider.value = holdDuration / 1000;
@@ -561,7 +584,6 @@ function loadData() {
                 wakeLockToggle.checked = isWakeLockEnabled;
                 inspectionToggle.checked = isInspectionMode;
                 
-                // Initialize UI state
                 if (isInspectionMode) {
                     toggleInspection(inspectionToggle);
                 } else {
@@ -579,7 +601,6 @@ function loadData() {
     }
     initSessionIfNeeded(currentEvent);
     
-    // Update status hint based on mode
     if (!isBtConnected) {
         statusHint.innerText = isInspectionMode ? "Start Inspection" : "Hold to Ready";
     }
@@ -1061,7 +1082,10 @@ function calculateAvg(list, count, mean=false) {
 
 // --- Interaction Logic with configurable Hold Time ---
 function handleStart(e) {
-    if (isBtConnected) return; 
+    // BT 모드일 때: 인스펙션 모드가 아니면 키보드 입력 무시 (기존 로직)
+    // 수정: BT + 인스펙션 모드면 키보드 허용 (인스펙션 시작용)
+    if (isBtConnected && !isInspectionMode) return; 
+    
     if(e && e.cancelable) e.preventDefault();
     if(isManualMode || isRunning) { if(isRunning) stopTimer(); return; }
     
@@ -1072,6 +1096,9 @@ function handleStart(e) {
     }
 
     if (isInspectionMode && inspectionState === 'inspecting') {
+        // BT 연결 시에는 키보드로 'Ready' 상태 진입 불가 (오직 간 타이머 핸즈온으로만 가능)
+        if (isBtConnected) return;
+
         // Pressed during inspection -> Ready to solve
         timerEl.style.color = '#ef4444'; 
         timerEl.classList.add('holding-status');
@@ -1084,7 +1111,7 @@ function handleStart(e) {
         return;
     }
 
-    // Standard Logic
+    // Standard Logic (BT 연결 시 여기 도달 안함)
     timerEl.style.color = '#ef4444'; 
     timerEl.classList.add('holding-status');
     
@@ -1097,7 +1124,19 @@ function handleStart(e) {
 }
 
 function handleEnd(e) {
-    if (isBtConnected) return; 
+    // [CRITICAL FIX] Prevent immediate inspection restart after stopping timer
+    if (Date.now() - lastStopTimestamp < 500) return;
+
+    // BT 모드일 때
+    if (isBtConnected) {
+        if (isInspectionMode && inspectionState === 'none') {
+             // BT 연결되어 있어도 인스펙션 모드라면 스페이스바 뗄 때 인스펙션 시작 허용
+             startInspection(); 
+        }
+        // BT 모드에서는 키보드 뗄 때 절대 startTimer() 호출 금지
+        return; 
+    }
+
     if(e && e.cancelable) e.preventDefault();
     clearTimeout(holdTimer);
 
