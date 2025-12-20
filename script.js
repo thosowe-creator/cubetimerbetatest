@@ -17,6 +17,13 @@ let holdDuration = 300; // ms
 let wakeLock = null;
 let isWakeLockEnabled = false;
 
+// Update Log Configuration
+const APP_VERSION = '1.0.1'; // Change this to trigger update modal for users
+const UPDATE_LOGS = [
+    "Fixed timing logic: 9.497 now shows as 9.49 (truncated) instead of 9.50 (rounded).",
+    "Added Update Log feature to show changes."
+];
+
 // Lazy Loading Vars
 let displayedSolvesCount = 50;
 const SOLVES_BATCH_SIZE = 50;
@@ -77,6 +84,21 @@ const wideMoves = ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"];
 let cubeState = {};
 const COLORS = { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' };
 
+// --- Update Log Logic ---
+function checkUpdateLog() {
+    const savedVersion = localStorage.getItem('appVersion');
+    if (savedVersion !== APP_VERSION) {
+        document.getElementById('updateVersion').innerText = `v${APP_VERSION}`;
+        const list = document.getElementById('updateList');
+        list.innerHTML = UPDATE_LOGS.map(log => `<li>${log}</li>`).join('');
+        document.getElementById('updateLogOverlay').classList.add('active');
+    }
+}
+window.closeUpdateLog = () => {
+    document.getElementById('updateLogOverlay').classList.remove('active');
+    localStorage.setItem('appVersion', APP_VERSION);
+};
+
 // --- Dark Mode ---
 function toggleDarkMode(checkbox) {
     const isDark = checkbox.checked;
@@ -93,9 +115,7 @@ async function requestWakeLock() {
             wakeLock.addEventListener('release', () => { console.log('Wake Lock released'); });
         }
     } catch (err) {
-        // Silently fail if blocked by permissions policy to avoid user annoyance
         console.log(`Wake Lock not available: ${err.message}`);
-        // Optional: visual feedback that wake lock failed could go here, but kept silent as requested.
     }
 }
 
@@ -294,9 +314,8 @@ function stopTimer(forcedTime = null) {
     saveData();
 }
 
-// --- Penalty Functions (Restored) ---
+// --- Penalty Functions ---
 function updatePenaltyBtns(s) {
-    // Safe check for elements existence
     if (plus2Btn && dnfBtn) {
         plus2Btn.className = `penalty-btn ${s?.penalty==='+2'?'active-plus2':'inactive'}`;
         dnfBtn.className = `penalty-btn ${s?.penalty==='DNF'?'active-dnf':'inactive'}`;
@@ -445,7 +464,7 @@ function getCurrentSessionId() {
     return sessions[currentEvent][0].id;
 }
 
-// --- Cube Logic (Same as before) ---
+// --- Cube Logic ---
 function initCube(n = 3) {
     cubeState = { n };
     ['U','D','L','R','F','B'].forEach(f => cubeState[f] = Array(n*n).fill(COLORS[f]));
@@ -645,15 +664,7 @@ function generateScramble() {
         currentScramble = res.join("\n");
         
     } else if (currentEvent === 'clock') {
-        // WCA Clock Notation: 
-        // UR, DR, DL, UL (dials 0-6)
-        // U, R, D, L (dials 0-6)
-        // ALL (dial 0-6)
-        // y2
-        // U, R, D, L, ALL (dials 0-6)
-        // UR, DR, DL, UL (Pins UP/DOWN) - Usually handled as binary state at end
-        
-        // Current simplified: Randomize all dial turns
+        // WCA Clock Notation
         const dials = ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"];
         dials.forEach(d => {
             const v = Math.floor(Math.random() * 12) - 5; // -5 to 6
@@ -674,130 +685,65 @@ function generateScramble() {
         currentScramble = res.join(" ");
         
     } else if (currentEvent === 'sq1') {
-        // Square-1 Simulation Logic
-        // Represent layer cut positions as boolean array of length 12 (1 unit = 30 deg)
-        // True = Cut allowed at this index (Piece boundary)
-        // Initial State: 
-        // Top: Corner(2), Edge(1), Corner(2), Edge(1)...
-        // Positions: 0(C), 2(E), 3(C), 5(E), 6(C), 8(E), 9(C), 11(E)
-        // Cuts allowed at: 0, 2, 3, 5, 6, 8, 9, 11
+        // Square-1 Simulation Logic (Truncated for brevity, same as before)
+        // ... (Logic remains identical to previous version, ensuring standard randomness)
         let topCuts = [true, false, true, true, false, true, true, false, true, true, false, true];
-        let botCuts = [true, false, true, true, false, true, true, false, true, true, false, true]; // Symmetric
-        
-        // Standard notation is (u, d) / ...
-        // u, d are integers -5 to 6.
-        // Move action: rotate the cuts array indices.
-        // Slash action: swap right half (indices 6 to 11) of Top and Bot.
-        // Validity check: topCuts[0], topCuts[6], botCuts[0], botCuts[6] must all be TRUE.
-        // Actually, slash axis is at 0 and 6. 
-        // Relative to layer: 
-        // If we perform (u, d), the layer rotates. The static slash axis stays.
-        // So we check if the layer's NEW position has cuts at 0 and 6.
+        let botCuts = [true, false, true, true, false, true, true, false, true, true, false, true]; 
         
         let movesCount = 0;
         let scrambleOps = [];
-        let topOffset = 0; // Cumulative offset
-        let botOffset = 0;
-        
-        // Helper to check slash ability
-        const canSlash = () => {
-            // Indices in standard array 0..11
-            // Current piece boundary at index `i` in the array corresponds to physical position `(i + offset) % 12`?
-            // No, let's rotate the array itself to simulate the move.
-            return topCuts[0] && topCuts[6] && botCuts[0] && botCuts[6];
-        };
         
         const rotateArray = (arr, amt) => {
-            // Rotate right by amt (positive = clockwise?) 
-            // SQ1 notation: positive = clockwise top, positive = clockwise bottom (looking from bottom? No, relative to cut).
-            // Let's just standard shift.
-            // (1,0) means top rotates 30deg.
-            // Array index 0 moves to 1?
-            // Let's implement logical rotation: shift array elements.
-            // Javascript: unshift/pop or splice.
-            
             const n = 12;
             let amount = amt % n;
             if (amount < 0) amount += n;
-            
-            // Rotate right by amount
             const spliced = arr.splice(n - amount, amount);
             arr.unshift(...spliced);
         };
 
-        while (movesCount < 12) { // 12 shape-shifting moves is decent
-            // Try random u, d
-            let u = Math.floor(Math.random() * 12) - 5; // -5 to 6
+        while (movesCount < 12) {
+            let u = Math.floor(Math.random() * 12) - 5;
             let d = Math.floor(Math.random() * 12) - 5;
-            
             if (u === 0 && d === 0) continue;
-            
-            // Tentatively rotate copies
             let nextTop = [...topCuts];
             let nextBot = [...botCuts];
-            
-            // Apply rotation to arrays (simulating the move)
-            // Note: In SQ1 notation, (3,0) moves Top layer 90 degrees.
-            // The 'seam' is fixed. The pieces move.
-            // So we shift the piece-boundary-map.
-            // Warning: SQ1 notation direction vs Array shift direction.
-            // Let's assume standard: (1,0) shifts pieces "left" relative to seam? 
-            // Actually, if we rotate top layer Clockwise, the piece at index 0 moves to index 1.
-            // So we shift array right.
             rotateArray(nextTop, u);
             rotateArray(nextBot, d);
             
-            // Check if slash is valid in this new orientation
             if (nextTop[0] && nextTop[6] && nextBot[0] && nextBot[6]) {
-                // Valid move sequence
                 scrambleOps.push(`(${u},${d})`);
-                
-                // Apply Slash: Swap right halves (indices 6..11)
                 let topRight = nextTop.slice(6, 12);
                 let botRight = nextBot.slice(6, 12);
-                
-                // Construct new arrays
-                // Top becomes: TopLeft + BotRight
-                // Bot becomes: BotLeft + TopRight
                 let newTop = [...nextTop.slice(0, 6), ...botRight];
                 let newBot = [...nextBot.slice(0, 6), ...topRight];
-                
                 topCuts = newTop;
                 botCuts = newBot;
-                
                 scrambleOps.push("/");
                 movesCount++;
             }
-            // Else: loop and try different random numbers
         }
         currentScramble = scrambleOps.join(" ");
 
     } else if (['pyra', 'skewb'].includes(currentEvent)) {
-        // Simple random moves
         let last = "";
         for (let i = 0; i < conf.len; i++) {
             let m;
-            do {
-                m = conf.moves[Math.floor(Math.random() * conf.moves.length)];
-            } while (m === last);
-            res.push(m + (Math.random() < 0.5 ? "'" : ""));
-            last = m;
+            do { m = conf.moves[Math.floor(Math.random() * conf.moves.length)]; } while (m === last);
+            res.push(m + (Math.random() < 0.5 ? "'" : "")); last = m;
         }
         if (currentEvent === 'pyra') {
             conf.tips.forEach(t => {
                 const r = Math.floor(Math.random() * 3);
-                if (r === 1) res.push(t);
-                else if (r === 2) res.push(t + "'");
+                if (r === 1) res.push(t); else if (r === 2) res.push(t + "'");
             });
         }
         currentScramble = res.join(" ");
         
     } else {
-        // NxN (3x3, 2x2, 4x4...) Optimized Random Move
+        // NxN Logic (Same as before)
         let lastAxis = -1;
         let secondLastAxis = -1;
         let lastMoveBase = "";
-        
         const getMoveAxis = (m) => {
             const c = m[0]; 
             if ("UD".includes(c)) return 0;
@@ -809,37 +755,19 @@ function generateScramble() {
         for (let i = 0; i < conf.len; i++) {
             let move, axis, base;
             let valid = false;
-            
             while (!valid) {
                 move = conf.moves[Math.floor(Math.random() * conf.moves.length)];
                 axis = getMoveAxis(move);
                 base = move[0]; 
-
-                // 1. Same base check (e.g. R followed by R)
-                if (base === lastMoveBase) {
-                    valid = false; continue;
-                }
-
-                // 2. Axis check (Avoid 3 moves on same axis like F B F)
-                // If current axis is same as last axis (e.g. F followed by B), 
-                // check if the one before last was ALSO same axis.
-                if (axis !== -1 && axis === lastAxis && axis === secondLastAxis) {
-                    valid = false; continue;
-                }
-                
+                if (base === lastMoveBase) { valid = false; continue; }
+                if (axis !== -1 && axis === lastAxis && axis === secondLastAxis) { valid = false; continue; }
                 valid = true;
             }
-            
             res.push(move + suffixes[Math.floor(Math.random() * 3)]);
-            
             secondLastAxis = lastAxis;
             lastAxis = axis;
             lastMoveBase = base;
         }
-
-        // Add WCA-like orientation for blind/large cubes if needed? 
-        // Usually only for 3BLD or if specifically requested.
-        // Code handles 'blind' category check
         if (currentEvent === '333bf') {
             const wideMoveCount = Math.floor(Math.random() * 2) + 1;
             for (let i = 0; i < wideMoveCount; i++) {
@@ -848,7 +776,6 @@ function generateScramble() {
                 res.push(wm + suf);
             }
         } else if (conf.cat === 'blind') {
-            // Random orientation for Blind
             res.push(orientations[Math.floor(Math.random() * orientations.length)]);
             if (Math.random() > 0.5) res.push(orientations[Math.floor(Math.random() * orientations.length)]);
         }
@@ -856,13 +783,7 @@ function generateScramble() {
     }
     
     scrambleEl.innerText = currentScramble;
-    if (conf.n) { 
-        initCube(conf.n); 
-        currentScramble.split(/\s+/).filter(s => s && !orientations.includes(s) && s!=='y2').forEach(applyMove); 
-        drawCube(); 
-    } else { 
-        cubeState={}; drawCube(); 
-    }
+    if (conf.n) { initCube(conf.n); currentScramble.split(/\s+/).filter(s => s && !orientations.includes(s) && s!=='y2').forEach(applyMove); drawCube(); } else { cubeState={}; drawCube(); }
     resetPenalty();
     if (activeTool === 'graph') renderHistoryGraph();
 }
@@ -900,7 +821,16 @@ window.copyMbfText = () => {
     const original = btn.innerText; btn.innerText = "Copied!"; setTimeout(() => btn.innerText = original, 2000);
 };
 
-function formatTime(ms) { return (ms/1000).toFixed(precision); } // Simplified for brevity in logic update
+// [UPDATED] Format Time to be Truncated (Floored) instead of Rounded
+function formatTime(ms) { 
+    if (precision === 3) {
+        return (ms / 1000).toFixed(3);
+    } else {
+        // For 2 decimals, we ignore the last digit (truncate)
+        // 9497ms -> 949 -> 9.49
+        return (Math.floor(ms / 10) / 100).toFixed(2);
+    }
+} 
 
 // Updated UpdateUI with Lazy Loading support
 function updateUI() {
@@ -953,9 +883,6 @@ window.showExtendedStats = () => {
     const ao50 = calculateAvg(filtered, 50);
     const ao100 = calculateAvg(filtered, 100);
     
-    // Best Avgs (Simple sliding window calculation could be added here for perfection, keeping simple current avg for now)
-    // Ideally we iterate to find best. Let's do simple Current Avg for now to keep code light.
-    
     const content = document.getElementById('statsContent');
     content.innerHTML = `
         <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
@@ -979,14 +906,11 @@ function calculateAvg(list, count, mean=false) {
     if(list.length < count) return "-";
     let slice = list.slice(0, count); let dnfC = slice.filter(s=>s.penalty==='DNF').length;
     
-    // Trim logic: Best 5% and Worst 5% removal for large averages (standard WCA is usually just 1 best 1 worst for Ao5, Ao12)
-    // For Ao5: remove 1 best, 1 worst.
-    // For Ao12: remove 1 best, 1 worst.
-    // For Ao100: remove 5 best, 5 worst.
+    // Trim logic: Best 5% and Worst 5% removal for large averages
     let removeCount = Math.ceil(count * 0.05); // 5%
     if (count <= 12) removeCount = 1; 
 
-    if(dnfC >= removeCount + (mean?0:1)) return "DNF"; // Rough DNF logic
+    if(dnfC >= removeCount + (mean?0:1)) return "DNF"; 
 
     let nums = slice.map(s => s.penalty==='DNF'?Infinity:(s.penalty==='+2'?s.time+2000:s.time));
     if(mean) return (nums.reduce((a,b)=>a+b,0)/count/1000).toFixed(precision);
@@ -1023,8 +947,6 @@ function handleEnd(e) {
         // Reset color logic for dark mode
         const isDark = document.documentElement.classList.contains('dark');
         timerEl.style.color = ''; 
-        // We rely on CSS class handling or remove inline style to revert to class-based color
-        // Removing inline style allows CSS to take over (text-slate-800 or dark:text-slate-100)
         
         timerEl.classList.remove('holding-status','ready-to-start'); 
         isReady=false; 
@@ -1035,7 +957,7 @@ function handleEnd(e) {
 window.openSessionModal = () => { document.getElementById('sessionOverlay').classList.add('active'); renderSessionList(); };
 window.closeSessionModal = () => { document.getElementById('sessionOverlay').classList.remove('active'); document.getElementById('newSessionName').value = ""; editingSessionId = null; };
 
-// ... (Session Management Functions: renderSessionList, editSessionName, saveSessionName, createNewSession, switchSession, deleteSession - kept same logic, just HTML template updated implicitly by not changing logic, but renderSessionList needs template update for Dark Mode) ...
+// ... (Session Management - Logic Preserved) ...
 
 function renderSessionList() {
     const listContainer = document.getElementById('sessionList');
@@ -1051,7 +973,7 @@ function renderSessionList() {
     document.getElementById('sessionCreateForm').classList.toggle('hidden', eventSessions.length >= 10);
 }
 
-// ... (Remaining window functions: editSessionName, saveSessionName, createNewSession, switchSession, deleteSession, openAvgShare, openSingleShare, closeAvgShare, copyShareText, eventListeners, showSolveDetails, closeModal, useThisScramble, document.getElementById('clearHistoryBtn').onclick - All logic preserved) ...
+// ... (Remaining window functions - Logic Preserved) ...
 window.editSessionName = (id) => { editingSessionId = id; renderSessionList(); };
 window.saveSessionName = (id) => { const input = document.getElementById('editSessionInput'); if (!input) return; const newName = input.value.trim(); if (newName) { const s = sessions[currentEvent].find(x => x.id === id); if (s) s.name = newName; } editingSessionId = null; renderSessionList(); updateUI(); saveData(); };
 window.createNewSession = () => { const nameInput = document.getElementById('newSessionName'); const name = nameInput.value.trim() || `Session ${sessions[currentEvent].length + 1}`; if (sessions[currentEvent].length >= 10) return; sessions[currentEvent].forEach(s => s.isActive = false); sessions[currentEvent].push({ id: Date.now(), name: name, isActive: true }); nameInput.value = ""; renderSessionList(); updateUI(); saveData(); timerEl.innerText = (0).toFixed(precision); resetPenalty(); };
@@ -1079,3 +1001,5 @@ document.getElementById('clearHistoryBtn').onclick = () => { const sid = getCurr
 
 loadData(); 
 changeEvent(currentEvent);
+// Check for updates on load
+checkUpdateLog();
