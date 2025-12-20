@@ -1026,15 +1026,27 @@ window.copyMbfText = () => {
     const original = btn.innerText; btn.innerText = "Copied!"; setTimeout(() => btn.innerText = original, 2000);
 };
 
-// [UPDATED] Format Time to be Truncated (Floored) instead of Rounded
+// [UPDATED] Format Time to support Minutes:Seconds format
 function formatTime(ms) { 
+    const minutes = Math.floor(ms / 60000);
+    const remainingMs = ms % 60000;
+    let seconds;
+
     if (precision === 3) {
-        return (ms / 1000).toFixed(3);
+        seconds = (remainingMs / 1000).toFixed(3);
     } else {
         // For 2 decimals, we ignore the last digit (truncate)
-        // 9497ms -> 949 -> 9.49
-        return (Math.floor(ms / 10) / 100).toFixed(2);
+        seconds = (Math.floor(remainingMs / 10) / 100).toFixed(2);
     }
+
+    if (minutes > 0) {
+        // Add leading zero if seconds is less than 10 (e.g. 1:05.43)
+        if (parseFloat(seconds) < 10) {
+            seconds = "0" + seconds;
+        }
+        return `${minutes}:${seconds}`;
+    }
+    return seconds;
 } 
 
 // Updated UpdateUI with Lazy Loading support
