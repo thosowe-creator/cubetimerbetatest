@@ -56,7 +56,8 @@
         </div>
     </header>
 
-    <!-- Modals -->
+    <!-- Modals (Bluetooth, Session, Mbf, Stats, Settings, Share, UpdateLog, SolveDetail) -->
+    <!-- ... (All modals kept exactly the same logic, just existing in HTML) ... -->
     
     <!-- Bluetooth Modal -->
     <div id="btOverlay" class="modal-overlay" onclick="closeBTModal()">
@@ -164,7 +165,7 @@
                     <div><p class="text-xs font-bold text-slate-600 dark:text-slate-300">Precision</p></div>
                     <div class="flex items-center gap-2"><span class="text-[9px] font-bold text-slate-400">.00</span><label class="switch"><input type="checkbox" id="precisionToggle"><span class="slider"></span></label><span class="text-[9px] font-bold text-slate-400">.000</span></div>
                 </div>
-                <!-- PC Backup Import moved here for mobile -->
+                <!-- PC Backup Import moved here for mobile if needed, but keeping in header for now -->
                 <div class="md:hidden flex gap-2 pt-2">
                     <button onclick="exportData()" class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl">Backup</button>
                     <button onclick="triggerImport()" class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl">Restore</button>
@@ -224,7 +225,7 @@
             </div>
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-3">
-                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.3.1</span>
+                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.2.0</span>
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Latest</span>
                 </div>
                 <ul id="updateList" class="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 marker:text-blue-500 list-disc pl-4"></ul>
@@ -233,11 +234,12 @@
         </div>
     </div>
 
-    <!-- Main Content (Fixed Scroll Issue: Removed flex-grow/overflow here, handled inside sections) -->
-    <main id="mainContent" class="main-container flex flex-col md:flex-row p-4 gap-6 w-full h-full overflow-hidden pb-20 md:pb-4">
+    <!-- Main Content -->
+    <!-- Added id='mainContent' and pb-20 for mobile bottom nav space -->
+    <main id="mainContent" class="main-container flex flex-col md:flex-row p-4 gap-6 flex-grow overflow-y-auto md:overflow-hidden pb-24 md:pb-4">
         
-        <!-- Timer View Section -->
-        <div id="timerSection" class="flex flex-col items-center justify-between h-full order-1 w-full overflow-y-auto custom-scroll">
+        <!-- Timer View Section (Shown by default on Mobile/Desktop) -->
+        <div id="timerSection" class="flex-grow flex flex-col items-center justify-between h-full order-1 w-full">
             <div class="w-full space-y-6">
                 <!-- Category Select -->
                 <div class="flex flex-col items-center gap-4">
@@ -256,6 +258,7 @@
                             <button onclick="changeEvent('777')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-777">7x7</button>
                             <button onclick="changeEvent('333oh')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-333oh">3x3 OH</button>
                         </div>
+                        <!-- ... other groups hidden by default ... -->
                         <div id="group-nonstandard" class="hidden flex gap-1">
                             <button onclick="changeEvent('clock')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-clock">Clock</button>
                             <button onclick="changeEvent('minx')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-minx">Megaminx</button>
@@ -289,21 +292,19 @@
             </div>
 
             <!-- Timer Area -->
-            <div id="timerContainer" class="flex flex-col items-center justify-center flex-grow w-full select-none py-6">
-                <!-- Added touch-action:none but handled in JS to allow badge clicks -->
+            <div id="timerContainer" class="flex flex-col items-center justify-center flex-grow w-full select-none">
                 <div id="timerInteractiveArea" class="rounded-3xl transition-colors hover:bg-slate-100/30 dark:hover:bg-slate-800/30 w-full h-full flex flex-col justify-center items-center">
                     <div id="timerDisplayContainer" class="w-full flex justify-center">
                         <div id="timer" class="timer-display text-slate-800 dark:text-slate-100 transition-all duration-100">0.00</div>
                         <input type="text" id="manualInput" class="manual-input hidden text-blue-500 dark:text-blue-400" placeholder="0.00">
                     </div>
                     
-                    <!-- Badges (Z-Index added for touch fix) -->
-                    <div class="flex gap-6 mt-8 relative z-10">
-                        <div class="avg-badge relative z-20" onclick="openAvgShare('primary'); event.stopPropagation();">
+                    <div class="flex gap-6 mt-8">
+                        <div class="avg-badge" onclick="openAvgShare('primary')">
                             <span id="labelPrimaryAvg" class="text-[11px] uppercase font-bold text-blue-400 mb-2 tracking-widest">Ao5</span>
                             <span id="displayPrimaryAvg" class="text-2xl md:text-3xl text-slate-700 dark:text-slate-200 font-bold tracking-tighter">-</span>
                         </div>
-                        <div class="avg-badge relative z-20" onclick="openAvgShare('ao12'); event.stopPropagation();">
+                        <div class="avg-badge" onclick="openAvgShare('ao12')">
                             <span class="text-[11px] uppercase font-bold text-purple-400 mb-2 tracking-widest">Ao12</span>
                             <span id="displayAo12" class="text-2xl md:text-3xl text-slate-700 dark:text-slate-200 font-bold tracking-tighter">-</span>
                         </div>
@@ -313,13 +314,14 @@
                 <div id="statusHint" class="bg-white dark:bg-slate-800 px-6 py-2 rounded-full text-slate-400 text-xs font-bold tracking-widest shadow-sm border border-slate-100 dark:border-slate-700 uppercase transition-all duration-200">Hold to Ready</div>
             </div>
 
+            <!-- Buttons: Penalty/Delete -->
             <div class="w-full max-w-xl flex justify-center gap-4 mt-2 mb-6">
                 <button id="plus2Btn" class="penalty-btn inactive" onclick="togglePenalty('+2')">+2</button>
                 <button id="dnfBtn" class="penalty-btn inactive" onclick="togglePenalty('DNF')">DNF</button>
             </div>
         </div>
 
-        <!-- History View Section -->
+        <!-- History View Section (Hidden on Mobile by default, Visible on Desktop) -->
         <div id="historySection" class="hidden md:flex w-full md:w-[360px] history-panel flex-col order-2 overflow-hidden shrink-0 bg-white dark:bg-slate-900 border border-transparent dark:border-slate-800 h-full">
             <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0 rounded-t-3xl">
                 <div class="flex items-center gap-2">
@@ -383,7 +385,7 @@
         </div>
     </main>
 
-    <!-- Mobile Bottom Navigation -->
+    <!-- Mobile Bottom Navigation (Hidden on PC) -->
     <nav class="md:hidden fixed bottom-0 w-full bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-around items-center h-16 pb-safe z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button onclick="switchMobileTab('timer')" id="mob-tab-timer" class="flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -393,13 +395,15 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
             <span class="text-[10px] font-bold mt-1">Stats</span>
         </button>
-        <!-- Updated: Uses toggleSettings() now -->
-        <button onclick="toggleSettings()" class="flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+        <button onclick="openSettings()" class="flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span class="text-[10px] font-bold mt-1">Settings</span>
         </button>
     </nav>
 
+    <!-- 외부 스크립트 연결 -->
     <script src="script.js"></script>
 </body>
 </html>
+</html>
+
