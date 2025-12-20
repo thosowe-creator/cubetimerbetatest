@@ -28,13 +28,11 @@ let hasSpoken12 = false;
 let lastStopTimestamp = 0;
 
 // Update Log Configuration
-const APP_VERSION = '1.3.0'; 
+const APP_VERSION = '1.1'; 
 const UPDATE_LOGS = [
-    "v1.3.0 모바일 UI 전면 개편!",
-    "하단 내비게이션 바 추가 (모바일 전용)",
-    "타이머 / 기록 탭 분리",
-    "PC에서는 기존 레이아웃 유지 (반응형)",
-    "인스펙션 및 블루투스 기능 안정화"
+    "V1.1 모바일 UI 개편,
+    "Gan Halo Timer 사용 시 소숫점이 반올림되던 현상 수정",
+    "인스펙션 기능 추가",
 ];
 
 // Lazy Loading Vars
@@ -1264,3 +1262,4 @@ loadData();
 changeEvent(currentEvent);
 // Check for updates on load
 checkUpdateLog();
+
