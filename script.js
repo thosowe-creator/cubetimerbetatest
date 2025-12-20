@@ -28,11 +28,12 @@ let hasSpoken12 = false;
 let lastStopTimestamp = 0;
 
 // Update Log Configuration
-const APP_VERSION = '1.1'; 
+const APP_VERSION = '1.3.3'; 
 const UPDATE_LOGS = [
-    "V1.1 모바일 UI 개편,
-    "Gan Halo Timer 사용 시 소숫점이 반올림되던 현상 수정",
-    "인스펙션 기능 추가",
+    "v1.3.3 모바일 UI 안정화",
+    "설정 탭 오류 수정 (열기/닫기 정상화)",
+    "모바일 미니 통계 (Best/Avg) 표시 기능 복구",
+    "스크립트 문법 오류 수정"
 ];
 
 // Lazy Loading Vars
@@ -105,38 +106,29 @@ const COLORS = { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16
 // --- Mobile Tab Logic ---
 window.switchMobileTab = (tab) => {
     if (tab === 'timer') {
-        // Show Timer, Hide History
         timerSection.classList.remove('hidden');
         historySection.classList.add('hidden');
         
-        // Update Tab Colors
         mobTabTimer.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
         mobTabHistory.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
     } else if (tab === 'history') {
-        // Hide Timer, Show History
         timerSection.classList.add('hidden');
         historySection.classList.remove('hidden');
-        // Force flex for history section when active on mobile
         historySection.classList.add('flex');
 
-        // Update Tab Colors
         mobTabHistory.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
         mobTabTimer.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
         
-        // Refresh graph if tool is active
         if(activeTool === 'graph') renderHistoryGraph();
     }
 };
 
-// Ensure desktop layout on resize
 window.addEventListener('resize', () => {
     if (window.innerWidth >= 768) {
-        // Desktop: Show both
         timerSection.classList.remove('hidden');
         historySection.classList.remove('hidden');
         historySection.classList.add('flex');
     } else {
-        // Mobile: Revert to current tab state (defaulting to timer if mixed)
         if (mobTabTimer.classList.contains('text-blue-600') || mobTabTimer.classList.contains('text-blue-400')) {
             switchMobileTab('timer');
         } else {
@@ -144,6 +136,16 @@ window.addEventListener('resize', () => {
         }
     }
 });
+
+// --- Settings Toggle Logic (Required for Mobile Nav) ---
+window.toggleSettings = () => {
+    const overlay = document.getElementById('settingsOverlay');
+    if (overlay.classList.contains('active')) {
+        closeSettings();
+    } else {
+        openSettings();
+    }
+}
 
 // --- Update Log Logic ---
 function checkUpdateLog() {
@@ -164,9 +166,8 @@ window.closeUpdateLog = () => {
 function toggleInspection(checkbox) {
     isInspectionMode = checkbox.checked;
     
-    // Force set hold duration to ~0 if inspection is ON
     if (isInspectionMode) {
-        updateHoldDuration(0.01); // Basically instant
+        updateHoldDuration(0.01); 
         holdDurationSlider.value = 0.01;
         holdDurationSlider.disabled = true;
         document.getElementById('holdDurationContainer').classList.add('opacity-50', 'pointer-events-none');
@@ -188,7 +189,7 @@ function startInspection() {
     hasSpoken12 = false;
     
     timerEl.classList.remove('text-ready');
-    timerEl.style.color = '#ef4444'; // Red color for inspection countdown
+    timerEl.style.color = '#ef4444'; 
     statusHint.innerText = "Inspection";
 
     if(inspectionInterval) clearInterval(inspectionInterval);
@@ -206,7 +207,6 @@ function startInspection() {
             inspectionPenalty = 'DNF';
         }
 
-        // TTS
         if (elapsed >= 8 && !hasSpoken8) {
             speak("Eight seconds");
             hasSpoken8 = true;
@@ -222,7 +222,6 @@ function stopInspection() {
     if(inspectionInterval) clearInterval(inspectionInterval);
     inspectionState = 'none';
     timerEl.style.color = '';
-    // Calculate penalty one last time to be precise
     if (isInspectionMode && inspectionStartTime > 0) {
         const elapsed = (Date.now() - inspectionStartTime) / 1000;
         if (elapsed > 17) inspectionPenalty = 'DNF';
@@ -344,7 +343,6 @@ function handleGanBTData(event) {
 
     const state = data.getUint8(3);
     
-    // Sync time when not running (1:GetSet, 2:HandsOff, 4:Stopped)
     if (state !== 3 && !isRunning && data.byteLength >= 8) {
         const min = data.getUint8(4);
         const sec = data.getUint8(5);
@@ -355,22 +353,19 @@ function handleGanBTData(event) {
 
     if (state !== lastBtState) {
         if (state === 6) { // HANDS_ON
-            // If inspecting, do not reset ready state (user puts hands on timer during inspection)
             if (!isInspectionMode) {
                 isReady = false;
                 timerEl.classList.add('text-ready'); 
                 statusHint.innerText = "Ready!";
             }
         } else if (state === 1) { // GET_SET
-        } else if (state === 2) { // HANDS_OFF (Just released)
-             // If inspecting, this is where we start the solve and end inspection
+        } else if (state === 2) { // HANDS_OFF
              if (!isInspectionMode) {
                  timerEl.classList.remove('text-ready', 'text-running');
                  statusHint.innerText = "Timer Ready (BT)";
              }
         } else if (state === 3) { // RUNNING
             if (!isRunning) {
-                // If inspection mode was active, stop it and check penalty
                 if (isInspectionMode && inspectionState === 'inspecting') {
                     stopInspection();
                 }
@@ -761,392 +756,42 @@ function renderHistoryGraph() {
     polyline.setAttribute('points', points);
 }
 
-function switchCategory(cat, autoSelectFirst = true) {
-    if(isRunning) return;
-    document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active', 'text-white'));
-    const catBtn = document.getElementById(`cat-${cat}`); 
-    if (catBtn) { 
-        catBtn.classList.add('active', 'text-white'); 
-        catBtn.classList.remove('text-slate-500', 'dark:text-slate-400');
-    }
-    const groups = ['standard', 'nonstandard', 'blind'];
-    groups.forEach(g => {
-        const el = document.getElementById(`group-${g}`);
-        if (g === cat) { el.classList.remove('hidden'); el.classList.add('flex'); }
-        else { el.classList.add('hidden'); el.classList.remove('flex'); }
-    });
-    if (autoSelectFirst) {
-        const targetGroup = document.getElementById(`group-${cat}`);
-        const firstButton = targetGroup.querySelector('button');
-        if (firstButton) changeEvent(firstButton.id.replace('tab-', ''));
-    }
-}
-
-function changeEvent(e) {
-    if(isRunning) return;
-    currentEvent = e;
-    const conf = configs[e];
-    initSessionIfNeeded(e);
-    
-    // Reset lazy loading on event change
-    displayedSolvesCount = SOLVES_BATCH_SIZE;
-    if(historyList) historyList.scrollTop = 0;
-
-    document.querySelectorAll('.event-tab').forEach(t => {
-        t.classList.remove('active', 'text-white', 'bg-blue-600');
-        t.classList.add('text-slate-500', 'dark:text-slate-400');
-    });
-    const activeTab = document.getElementById(`tab-${e}`); 
-    if (activeTab) {
-        activeTab.classList.add('active', 'text-white', 'bg-blue-600');
-        activeTab.classList.remove('text-slate-500', 'dark:text-slate-400');
-    }
-    
-    if (conf.cat === 'blind') {
-        activeTool = 'graph'; 
-        selectTool('graph');
-    } else {
-        if (activeTool === 'graph') selectTool('graph');
-        else selectTool('scramble');
-    }
-
-    if (['666', '777', '333bf', '444bf', '555bf', '333mbf'].includes(e)) { 
-        isAo5Mode = false; avgModeToggle.checked = false; 
-    } else { 
-        isAo5Mode = true; avgModeToggle.checked = true; 
-    }
-
-    if (currentEvent === '333mbf') {
-        scrambleEl.classList.add('hidden');
-        mbfInputArea.classList.remove('hidden');
-    } else {
-        scrambleEl.classList.remove('hidden');
-        mbfInputArea.classList.add('hidden');
-        generateScramble(); 
-    }
-    
-    updateUI(); timerEl.innerText = (0).toFixed(precision); saveData();
-}
-
-function generate3bldScrambleText() {
-    const conf = configs['333bf'];
-    let res = [];
-    let last = "";
-    for (let i = 0; i < conf.len; i++) {
-        let m; do { m = conf.moves[Math.floor(Math.random() * conf.moves.length)]; } while (m[0] === last[0]);
-        res.push(m + suffixes[Math.floor(Math.random() * 3)]); last = m;
-    }
-    const wideMoveCount = Math.floor(Math.random() * 2) + 1;
-    for (let i = 0; i < wideMoveCount; i++) {
-        const wm = wideMoves[Math.floor(Math.random() * wideMoves.length)];
-        const suf = suffixes[Math.floor(Math.random() * 3)];
-        res.push(wm + suf);
-    }
-    return res.join(" ");
-}
-
-function generateScramble() {
-    const conf = configs[currentEvent]; if (!conf || currentEvent === '333mbf') return;
-    let res = [];
-    
-    if (currentEvent === 'minx') {
-        // Megaminx: Pochmann style, optimized
-        // 7 lines of R++ D++ ...
-        for (let i = 0; i < 7; i++) {
-            let line = [];
-            // 10 moves per line (5 pairs of R/D)
-            for (let j = 0; j < 10; j++) {
-                // WCA style: R++ or R--, D++ or D--
-                // Usually alternating R and D
-                const type = (j % 2 === 0) ? "R" : "D";
-                const suffix = (Math.random() < 0.5) ? "++" : "--";
-                line.push(type + suffix);
-            }
-            // End with U or U'
-            line.push(Math.random() < 0.5 ? "U" : "U'");
-            res.push(line.join(" "));
-        }
-        currentScramble = res.join("\n");
-        
-    } else if (currentEvent === 'clock') {
-        // WCA Clock Notation
-        const dials = ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"];
-        dials.forEach(d => {
-            const v = Math.floor(Math.random() * 12) - 5; // -5 to 6
-            res.push(`${d}${v >= 0 ? '+' : ''}${v}`);
-        });
-        res.push("y2");
-        const dials2 = ["U", "R", "D", "L", "ALL"];
-        dials2.forEach(d => {
-            const v = Math.floor(Math.random() * 12) - 5;
-            res.push(`${d}${v >= 0 ? '+' : ''}${v}`);
-        });
-        // Pins: Randomly up or down
-        let pins = [];
-        ["UR", "DR", "DL", "UL"].forEach(p => {
-            if (Math.random() < 0.5) pins.push(p);
-        });
-        if (pins.length) res.push(pins.join(" "));
-        currentScramble = res.join(" ");
-        
-    } else if (currentEvent === 'sq1') {
-        // Square-1 Simulation Logic (Truncated for brevity, same as before)
-        // ... (Logic remains identical to previous version, ensuring standard randomness)
-        let topCuts = [true, false, true, true, false, true, true, false, true, true, false, true];
-        let botCuts = [true, false, true, true, false, true, true, false, true, true, false, true]; 
-        
-        let movesCount = 0;
-        let scrambleOps = [];
-        
-        const rotateArray = (arr, amt) => {
-            const n = 12;
-            let amount = amt % n;
-            if (amount < 0) amount += n;
-            const spliced = arr.splice(n - amount, amount);
-            arr.unshift(...spliced);
-        };
-
-        while (movesCount < 12) {
-            let u = Math.floor(Math.random() * 12) - 5;
-            let d = Math.floor(Math.random() * 12) - 5;
-            if (u === 0 && d === 0) continue;
-            let nextTop = [...topCuts];
-            let nextBot = [...botCuts];
-            rotateArray(nextTop, u);
-            rotateArray(nextBot, d);
-            
-            if (nextTop[0] && nextTop[6] && nextBot[0] && nextBot[6]) {
-                scrambleOps.push(`(${u},${d})`);
-                let topRight = nextTop.slice(6, 12);
-                let botRight = nextBot.slice(6, 12);
-                let newTop = [...nextTop.slice(0, 6), ...botRight];
-                let newBot = [...nextBot.slice(0, 6), ...topRight];
-                topCuts = newTop;
-                botCuts = newBot;
-                scrambleOps.push("/");
-                movesCount++;
-            }
-        }
-        currentScramble = scrambleOps.join(" ");
-
-    } else if (['pyra', 'skewb'].includes(currentEvent)) {
-        let last = "";
-        for (let i = 0; i < conf.len; i++) {
-            let m;
-            do { m = conf.moves[Math.floor(Math.random() * conf.moves.length)]; } while (m === last);
-            res.push(m + (Math.random() < 0.5 ? "'" : "")); last = m;
-        }
-        if (currentEvent === 'pyra') {
-            conf.tips.forEach(t => {
-                const r = Math.floor(Math.random() * 3);
-                if (r === 1) res.push(t); else if (r === 2) res.push(t + "'");
-            });
-        }
-        currentScramble = res.join(" ");
-        
-    } else {
-        // NxN Logic (Same as before)
-        let lastAxis = -1;
-        let secondLastAxis = -1;
-        let lastMoveBase = "";
-        const getMoveAxis = (m) => {
-            const c = m[0]; 
-            if ("UD".includes(c)) return 0;
-            if ("LR".includes(c)) return 1;
-            if ("FB".includes(c)) return 2;
-            return -1;
-        };
-
-        for (let i = 0; i < conf.len; i++) {
-            let move, axis, base;
-            let valid = false;
-            while (!valid) {
-                move = conf.moves[Math.floor(Math.random() * conf.moves.length)];
-                axis = getMoveAxis(move);
-                base = move[0]; 
-                if (base === lastMoveBase) { valid = false; continue; }
-                if (axis !== -1 && axis === lastAxis && axis === secondLastAxis) { valid = false; continue; }
-                valid = true;
-            }
-            res.push(move + suffixes[Math.floor(Math.random() * 3)]);
-            secondLastAxis = lastAxis;
-            lastAxis = axis;
-            lastMoveBase = base;
-        }
-        if (currentEvent === '333bf') {
-            const wideMoveCount = Math.floor(Math.random() * 2) + 1;
-            for (let i = 0; i < wideMoveCount; i++) {
-                const wm = wideMoves[Math.floor(Math.random() * wideMoves.length)];
-                const suf = suffixes[Math.floor(Math.random() * 3)];
-                res.push(wm + suf);
-            }
-        } else if (conf.cat === 'blind') {
-            res.push(orientations[Math.floor(Math.random() * orientations.length)]);
-            if (Math.random() > 0.5) res.push(orientations[Math.floor(Math.random() * orientations.length)]);
-        }
-        currentScramble = res.join(" ");
-    }
-    
-    scrambleEl.innerText = currentScramble;
-    if (conf.n) { initCube(conf.n); currentScramble.split(/\s+/).filter(s => s && !orientations.includes(s) && s!=='y2').forEach(applyMove); drawCube(); } else { cubeState={}; drawCube(); }
-    resetPenalty();
-    if (activeTool === 'graph') renderHistoryGraph();
-}
-
-window.generateMbfScrambles = () => {
-    const count = parseInt(mbfCubeInput.value);
-    if (!count || count < 2 || count > 100) return;
-    const listContainer = document.getElementById('mbfScrambleList');
-    document.getElementById('mbfCubeCountDisplay').innerText = `${count} Cubes`;
-    listContainer.innerHTML = "";
-    for (let i = 1; i <= count; i++) {
-        const scr = generate3bldScrambleText();
-        listContainer.innerHTML += `
-            <div class="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="w-6 h-6 flex items-center justify-center bg-blue-600 text-white rounded-full text-[10px] font-bold">#${i}</span>
-                    <span class="text-[10px] font-black uppercase text-slate-400">Scramble</span>
-                </div>
-                <p class="font-bold text-slate-600 dark:text-slate-300 leading-relaxed scramble-text">${scr}</p>
-            </div>`;
-    }
-    document.getElementById('mbfScrambleOverlay').classList.add('active');
-    currentScramble = `Multi-Blind (${count} Cubes Attempt)`;
-};
-
-window.closeMbfScrambleModal = () => document.getElementById('mbfScrambleOverlay').classList.remove('active');
-
-window.copyMbfText = () => {
-    const texts = Array.from(document.querySelectorAll('.scramble-text')).map((el, i) => `${i+1}. ${el.innerText}`).join('\n\n');
-    const countText = document.getElementById('mbfCubeCountDisplay').innerText;
-    const fullText = `[CubeTimer] Multi-Blind Scrambles (${countText})\n\n${texts}`;
-    const textArea = document.createElement("textarea"); textArea.value = fullText; document.body.appendChild(textArea); textArea.select();
-    document.execCommand('copy'); document.body.removeChild(textArea);
-    const btn = document.querySelector('[onclick="copyMbfText()"]');
-    const original = btn.innerText; btn.innerText = "Copied!"; setTimeout(() => btn.innerText = original, 2000);
-};
-
-// [UPDATED] Format Time to be Truncated (Floored) instead of Rounded
-function formatTime(ms) { 
-    if (precision === 3) {
-        return (ms / 1000).toFixed(3);
-    } else {
-        // For 2 decimals, we ignore the last digit (truncate)
-        // 9497ms -> 949 -> 9.49
-        return (Math.floor(ms / 10) / 100).toFixed(2);
-    }
-} 
-
-// Updated UpdateUI with Lazy Loading support
-function updateUI() {
-    const sid = getCurrentSessionId();
-    let filtered = solves.filter(s => s.event === currentEvent && s.sessionId === sid);
-    const activeSession = (sessions[currentEvent] || []).find(s => s.isActive);
-    if (activeSession) document.getElementById('currentSessionNameDisplay').innerText = activeSession.name;
-    
-    // Lazy Render Logic
-    const subset = filtered.slice(0, displayedSolvesCount);
-    
-    historyList.innerHTML = subset.map(s => `
-        <div class="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-3 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm transition-all" onclick="showSolveDetails(${s.id})">
-            <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">${s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span>
-            <button onclick="event.stopPropagation(); deleteSolve(${s.id})" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
-            </button>
-        </div>
-    `).join('') || '<div class="text-center py-10 text-slate-300 text-[11px] italic">No solves yet</div>';
-
-    solveCountEl.innerText = filtered.length;
-    if (isAo5Mode) { labelPrimaryAvg.innerText = "Ao5"; displayPrimaryAvg.innerText = calculateAvg(filtered, 5); } 
-    else { labelPrimaryAvg.innerText = "Mo3"; displayPrimaryAvg.innerText = calculateAvg(filtered, 3, true); }
-    displayAo12.innerText = calculateAvg(filtered, 12);
-    let valid = filtered.filter(s=>s.penalty!=='DNF').map(s=>s.penalty==='+2'?s.time+2000:s.time);
-    sessionAvgEl.innerText = valid.length ? formatTime(valid.reduce((a,b)=>a+b,0)/valid.length) : "-";
-    bestSolveEl.innerText = valid.length ? formatTime(Math.min(...valid)) : "-";
-    if (activeTool === 'graph') renderHistoryGraph();
-}
-
-// Infinite Scroll Event Listener
-historyList.addEventListener('scroll', () => {
-    if (historyList.scrollTop + historyList.clientHeight >= historyList.scrollHeight - 50) {
-        // Near bottom
-        const sid = getCurrentSessionId();
-        const total = solves.filter(s => s.event === currentEvent && s.sessionId === sid).length;
-        if (displayedSolvesCount < total) {
-            displayedSolvesCount += SOLVES_BATCH_SIZE;
-            updateUI(); // Re-render with more items
-        }
-    }
-});
-
-// Extended Stats Modal Logic
-window.showExtendedStats = () => {
-    const sid = getCurrentSessionId();
-    const filtered = solves.filter(s => s.event === currentEvent && s.sessionId === sid);
-    
-    const ao25 = calculateAvg(filtered, 25);
-    const ao50 = calculateAvg(filtered, 50);
-    const ao100 = calculateAvg(filtered, 100);
-    
-    const content = document.getElementById('statsContent');
-    content.innerHTML = `
-        <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-            <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Current Ao25</span>
-            <span class="text-lg font-bold text-slate-700 dark:text-white">${ao25}</span>
-        </div>
-        <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-            <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Current Ao50</span>
-            <span class="text-lg font-bold text-slate-700 dark:text-white">${ao50}</span>
-        </div>
-        <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-            <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Current Ao100</span>
-            <span class="text-lg font-bold text-slate-700 dark:text-white">${ao100}</span>
-        </div>
-    `;
-    document.getElementById('statsOverlay').classList.add('active');
-}
-window.closeStatsModal = () => document.getElementById('statsOverlay').classList.remove('active');
-
-function calculateAvg(list, count, mean=false) {
-    if(list.length < count) return "-";
-    let slice = list.slice(0, count); let dnfC = slice.filter(s=>s.penalty==='DNF').length;
-    
-    // Trim logic: Best 5% and Worst 5% removal for large averages
-    let removeCount = Math.ceil(count * 0.05); // 5%
-    if (count <= 12) removeCount = 1; 
-
-    if(dnfC >= removeCount + (mean?0:1)) return "DNF"; 
-
-    let nums = slice.map(s => s.penalty==='DNF'?Infinity:(s.penalty==='+2'?s.time+2000:s.time));
-    if(mean) return (nums.reduce((a,b)=>a+b,0)/count/1000).toFixed(precision);
-    
-    nums.sort((a,b)=>a-b); 
-    // Remove outliers
-    for(let i=0; i<removeCount; i++) { nums.pop(); nums.shift(); }
-    
-    return (nums.reduce((a,b)=>a+b,0)/nums.length/1000).toFixed(precision);
-}
-
 // --- Interaction Logic with configurable Hold Time ---
 function handleStart(e) {
-    // BT 모드일 때: 인스펙션 모드가 아니면 키보드 입력 무시 (기존 로직)
-    // 수정: BT + 인스펙션 모드면 키보드 허용 (인스펙션 시작용)
-    if (isBtConnected && !isInspectionMode) return; 
+    // 1. Ignore if BT connected (except when starting inspection)
+    if (isBtConnected && !isInspectionMode) return;
     
-    if(e && e.cancelable) e.preventDefault();
-    if(isManualMode || isRunning) { if(isRunning) stopTimer(); return; }
+    // 2. [CRITICAL] Ignore if touching buttons/badges
+    if (e.target.closest('button') || e.target.closest('.avg-badge') || e.target.closest('.tools-dropdown') || e.target.closest('input')) return;
+
+    // 3. Only prevent default if we are about to start a hold (prevents scroll otherwise)
+    // But if we don't preventDefault, hold logic might be interrupted by scroll.
+    // Solution: If user touches "timerDisplayContainer" (the digits), we block scroll. Else we allow scroll.
+    const isTimerTouch = e.target.closest('#timerDisplayContainer');
+    
+    if (isTimerTouch) {
+        if(e.cancelable) e.preventDefault();
+    } else {
+        // If touching empty space, we allow scroll, UNLESS timer is running (tap to stop)
+        if (isRunning) {
+            if(e.cancelable) e.preventDefault(); // Stop scroll when trying to stop timer
+            stopTimer();
+            return;
+        }
+        // If not running and not touching timer digits, allow scroll -> DO NOT start hold
+        return; 
+    }
+
+    if(isManualMode) return;
     
     // Inspection Logic Handling
     if (isInspectionMode && inspectionState === 'none') {
-        // Space pressed in Idle with inspection ON: Do nothing (wait for release to start inspection)
-        return;
+        return; // Wait for release
     }
 
     if (isInspectionMode && inspectionState === 'inspecting') {
-        // BT 연결 시에는 키보드로 'Ready' 상태 진입 불가 (오직 간 타이머 핸즈온으로만 가능)
-        if (isBtConnected) return;
-
-        // Pressed during inspection -> Ready to solve
+        if (isBtConnected) return; // Only hardware starts solve in BT mode
+        
         timerEl.style.color = '#ef4444'; 
         timerEl.classList.add('holding-status');
         holdTimer = setTimeout(()=> { 
@@ -1158,7 +803,7 @@ function handleStart(e) {
         return;
     }
 
-    // Standard Logic (BT 연결 시 여기 도달 안함)
+    // Standard Logic
     timerEl.style.color = '#ef4444'; 
     timerEl.classList.add('holding-status');
     
@@ -1173,19 +818,29 @@ function handleStart(e) {
 function handleEnd(e) {
     // [CRITICAL FIX] Prevent immediate inspection restart after stopping timer
     if (Date.now() - lastStopTimestamp < 500) return;
+    
+    if (e.target.closest('button') || e.target.closest('.avg-badge') || e.target.closest('.tools-dropdown') || e.target.closest('input')) return;
 
-    // BT 모드일 때
     if (isBtConnected) {
         if (isInspectionMode && inspectionState === 'none') {
-             // BT 연결되어 있어도 인스펙션 모드라면 스페이스바 뗄 때 인스펙션 시작 허용
              startInspection(); 
         }
-        // BT 모드에서는 키보드 뗄 때 절대 startTimer() 호출 금지
         return; 
     }
 
-    if(e && e.cancelable) e.preventDefault();
+    // Tap to stop (screen wide)
+    if (isRunning) {
+        stopTimer();
+        return;
+    }
+
+    // Only proceed if we were actually holding (checked via holdTimer presence or isReady)
+    // If handleStart returned early (scrolling), holdTimer is null.
+    if (!holdTimer && !isReady && !isInspectionMode) return; 
+
+    if(e.cancelable) e.preventDefault();
     clearTimeout(holdTimer);
+    holdTimer = null;
 
     if (isManualMode) return;
 
@@ -1198,16 +853,12 @@ function handleEnd(e) {
     if(!isRunning && isReady) {
         startTimer();
     } else { 
-        // Reset color logic for dark mode
         timerEl.style.color = ''; 
-        
         timerEl.classList.remove('holding-status','ready-to-start'); 
         isReady=false; 
-        // If inspecting, don't reset to "Hold to Ready"
         if (!isInspectionMode || inspectionState === 'none') {
             statusHint.innerText= isInspectionMode ? "Start Inspection" : "Hold to Ready";
         } else {
-            // Returned to inspecting state without starting
             timerEl.style.color = '#ef4444'; 
         }
     }
@@ -1216,8 +867,7 @@ function handleEnd(e) {
 window.openSessionModal = () => { document.getElementById('sessionOverlay').classList.add('active'); renderSessionList(); };
 window.closeSessionModal = () => { document.getElementById('sessionOverlay').classList.remove('active'); document.getElementById('newSessionName').value = ""; editingSessionId = null; };
 
-// ... (Session Management Functions - Logic Preserved) ...
-
+// ... (Rest of Session Management Logic Preserved) ...
 function renderSessionList() {
     const listContainer = document.getElementById('sessionList');
     const eventSessions = sessions[currentEvent] || [];
@@ -1232,7 +882,7 @@ function renderSessionList() {
     document.getElementById('sessionCreateForm').classList.toggle('hidden', eventSessions.length >= 10);
 }
 
-// ... (Remaining window functions - Logic Preserved) ...
+// ... (Rest of window functions - Logic Preserved) ...
 window.editSessionName = (id) => { editingSessionId = id; renderSessionList(); };
 window.saveSessionName = (id) => { const input = document.getElementById('editSessionInput'); if (!input) return; const newName = input.value.trim(); if (newName) { const s = sessions[currentEvent].find(x => x.id === id); if (s) s.name = newName; } editingSessionId = null; renderSessionList(); updateUI(); saveData(); };
 window.createNewSession = () => { const nameInput = document.getElementById('newSessionName'); const name = nameInput.value.trim() || `Session ${sessions[currentEvent].length + 1}`; if (sessions[currentEvent].length >= 10) return; sessions[currentEvent].forEach(s => s.isActive = false); sessions[currentEvent].push({ id: Date.now(), name: name, isActive: true }); nameInput.value = ""; renderSessionList(); updateUI(); saveData(); timerEl.innerText = (0).toFixed(precision); resetPenalty(); };
@@ -1242,8 +892,8 @@ window.openAvgShare = (type) => { const sid = getCurrentSessionId(); const count
 window.openSingleShare = () => { const s = solves.find(x => x.id === selectedSolveId); if (!s) return; closeModal(); const dateStr = s.date || new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, ""); document.getElementById('shareDate').innerText = `Date : ${dateStr}.`; document.getElementById('shareLabel').innerText = `Single :`; document.getElementById('shareAvg').innerText = s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time) + (s.penalty==='+2'?'+':''); const listContainer = document.getElementById('shareList'); listContainer.innerHTML = `<div class="flex flex-col p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-slate-400 w-4">1.</span><span class="font-bold text-slate-800 dark:text-slate-200 text-sm min-w-[50px]">${s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span><span class="text-[10px] text-slate-400 font-medium italic truncate flex-grow">${s.scramble}</span></div></div>`; document.getElementById('avgShareOverlay').classList.add('active'); };
 window.closeAvgShare = () => document.getElementById('avgShareOverlay').classList.remove('active');
 window.copyShareText = () => { const date = document.getElementById('shareDate').innerText; const avgLabel = document.getElementById('shareLabel').innerText; const avgVal = document.getElementById('shareAvg').innerText; const isSingle = avgLabel.includes('Single'); let text = `[CubeTimer]\n\n${date}\n\n${avgLabel} ${avgVal}\n\n`; if (isSingle) { const s = solves.find(x => x.id === selectedSolveId); if (s) text += `1. ${avgVal}   ${s.scramble}\n`; } else { const count = avgLabel.includes('5') ? 5 : (avgLabel.includes('3') ? 3 : 12); const sid = getCurrentSessionId(); const filtered = solves.filter(s => s.event === currentEvent && s.sessionId === sid).slice(0, count); filtered.reverse().forEach((s, i) => { text += `${i+1}. ${s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}   ${s.scramble}\n`; }); } const textArea = document.createElement("textarea"); textArea.value = text; document.body.appendChild(textArea); textArea.select(); try { document.execCommand('copy'); const btn = document.querySelector('[onclick="copyShareText()"]'); const original = btn.innerHTML; btn.innerHTML = "Copied!"; btn.classList.add('bg-green-600'); setTimeout(() => { btn.innerHTML = original; btn.classList.remove('bg-green-600'); }, 2000); } catch (err) { console.error('Copy failed', err); } document.body.removeChild(textArea); };
-window.addEventListener('keydown', e => { if(editingSessionId || document.activeElement.tagName === 'INPUT') { if(e.code === 'Enter' && document.activeElement === manualInput) {} else { return; } } if(e.code==='Space' && !e.repeat) { e.preventDefault(); handleStart(); } if(isManualMode && e.code==='Enter') { let v = parseFloat(manualInput.value); if(v>0) { solves.unshift({ id:Date.now(), time:v*1000, scramble:currentScramble, event:currentEvent, sessionId: getCurrentSessionId(), penalty:null, date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, "") }); manualInput.value=""; updateUI(); generateScramble(); saveData(); } } });
-window.addEventListener('keyup', e => { if(e.code==='Space' && !editingSessionId) handleEnd(); });
+window.addEventListener('keydown', e => { if(editingSessionId || document.activeElement.tagName === 'INPUT') { if(e.code === 'Enter' && document.activeElement === manualInput) {} else { return; } } if(e.code==='Space' && !e.repeat) { e.preventDefault(); handleStart(e); } if(isManualMode && e.code==='Enter') { let v = parseFloat(manualInput.value); if(v>0) { solves.unshift({ id:Date.now(), time:v*1000, scramble:currentScramble, event:currentEvent, sessionId: getCurrentSessionId(), penalty:null, date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, "") }); manualInput.value=""; updateUI(); generateScramble(); saveData(); } } });
+window.addEventListener('keyup', e => { if(e.code==='Space' && !editingSessionId) handleEnd(e); });
 const interactiveArea = document.getElementById('timerInteractiveArea');
 interactiveArea.addEventListener('touchstart', handleStart, { passive: false });
 interactiveArea.addEventListener('touchend', handleEnd, { passive: false });
@@ -1262,4 +912,3 @@ loadData();
 changeEvent(currentEvent);
 // Check for updates on load
 checkUpdateLog();
-
