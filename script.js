@@ -25,16 +25,16 @@ let inspectionInterval = null;
 let inspectionPenalty = null; // null, '+2', 'DNF'
 let hasSpoken8 = false;
 let hasSpoken12 = false;
-let lastStopTimestamp = 0; // 버그 수정: 타이머 멈춘 시각 기록 (쿨다운용)
+let lastStopTimestamp = 0;
 
 // Update Log Configuration
-const APP_VERSION = '1.2.0'; 
+const APP_VERSION = '1.3.0'; 
 const UPDATE_LOGS = [
-    "v1.2.0 긴급 수정 및 기능 개선",
-    "버그 수정: 솔브 후 스페이스바를 뗄 때 인스펙션이 바로 재시작되는 문제 해결",
-    "기능 개선: 간 타이머 연결 시에도 스페이스바로 인스펙션 카운트다운 사용 가능",
-    "로직 변경: 간 타이머 모드 시 키보드로는 절대 타이머가 시작되지 않음 (오직 하드웨어로만 시작)",
-    "연동 강화: 간 타이머 시작 시 인스펙션 시간 초과 페널티(+2, DNF) 자동 적용"
+    "v1.3.0 모바일 UI 전면 개편!",
+    "하단 내비게이션 바 추가 (모바일 전용)",
+    "타이머 / 기록 탭 분리",
+    "PC에서는 기존 레이아웃 유지 (반응형)",
+    "인스펙션 및 블루투스 기능 안정화"
 ];
 
 // Lazy Loading Vars
@@ -72,6 +72,12 @@ const holdDurationSlider = document.getElementById('holdDurationSlider');
 const holdDurationValue = document.getElementById('holdDurationValue');
 const inspectionToggle = document.getElementById('inspectionToggle');
 
+// UI Sections for Mobile Tab Switching
+const timerSection = document.getElementById('timerSection');
+const historySection = document.getElementById('historySection');
+const mobTabTimer = document.getElementById('mob-tab-timer');
+const mobTabHistory = document.getElementById('mob-tab-history');
+
 const configs = {
     '333': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'standard' },
     '333oh': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'standard' },
@@ -97,6 +103,49 @@ const wideMoves = ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"];
 
 let cubeState = {};
 const COLORS = { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' };
+
+// --- Mobile Tab Logic ---
+window.switchMobileTab = (tab) => {
+    if (tab === 'timer') {
+        // Show Timer, Hide History
+        timerSection.classList.remove('hidden');
+        historySection.classList.add('hidden');
+        
+        // Update Tab Colors
+        mobTabTimer.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
+        mobTabHistory.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
+    } else if (tab === 'history') {
+        // Hide Timer, Show History
+        timerSection.classList.add('hidden');
+        historySection.classList.remove('hidden');
+        // Force flex for history section when active on mobile
+        historySection.classList.add('flex');
+
+        // Update Tab Colors
+        mobTabHistory.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
+        mobTabTimer.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
+        
+        // Refresh graph if tool is active
+        if(activeTool === 'graph') renderHistoryGraph();
+    }
+};
+
+// Ensure desktop layout on resize
+window.addEventListener('resize', () => {
+    if (window.innerWidth >= 768) {
+        // Desktop: Show both
+        timerSection.classList.remove('hidden');
+        historySection.classList.remove('hidden');
+        historySection.classList.add('flex');
+    } else {
+        // Mobile: Revert to current tab state (defaulting to timer if mixed)
+        if (mobTabTimer.classList.contains('text-blue-600') || mobTabTimer.classList.contains('text-blue-400')) {
+            switchMobileTab('timer');
+        } else {
+            switchMobileTab('history');
+        }
+    }
+});
 
 // --- Update Log Logic ---
 function checkUpdateLog() {
@@ -399,7 +448,7 @@ function startTimer() {
 function stopTimer(forcedTime = null) {
     clearInterval(timerInterval);
     let elapsed = forcedTime !== null ? forcedTime : (Date.now() - startTime);
-    lastStopTimestamp = Date.now(); // Record stop time to prevent immediate inspection restart
+    lastStopTimestamp = Date.now(); 
     
     let finalPenalty = inspectionPenalty; 
 
@@ -427,7 +476,7 @@ function stopTimer(forcedTime = null) {
     
     isRunning = isReady = false; 
     inspectionState = 'none'; 
-    inspectionPenalty = null; // Reset penalty for next solve
+    inspectionPenalty = null; 
     
     updateUI(); 
     generateScramble();
