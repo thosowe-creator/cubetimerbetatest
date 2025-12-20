@@ -18,10 +18,12 @@ let wakeLock = null;
 let isWakeLockEnabled = false;
 
 // Update Log Configuration
-const APP_VERSION = '1.0.1'; // Change this to trigger update modal for users
+const APP_VERSION = '1.0.2'; // Change this to trigger update modal for users
 const UPDATE_LOGS = [
-    "Fixed timing logic: 9.497 now shows as 9.49 (truncated) instead of 9.50 (rounded).",
-    "Added Update Log feature to show changes."
+    "v1.0.2 업데이트 완료!",
+    "시간 표시 방식 변경: 9.497초 → 9.49초 (소수점 3째자리 버림 적용)",
+    "업데이트 내역 팝업 기능 추가",
+    "설정에서 'Precision'이 .00으로 되어 있어야 절삭이 적용됩니다."
 ];
 
 // Lazy Loading Vars
@@ -883,6 +885,9 @@ window.showExtendedStats = () => {
     const ao50 = calculateAvg(filtered, 50);
     const ao100 = calculateAvg(filtered, 100);
     
+    // Best Avgs (Simple sliding window calculation could be added here for perfection, keeping simple current avg for now)
+    // Ideally we iterate to find best. Let's do simple Current Avg for now to keep code light.
+    
     const content = document.getElementById('statsContent');
     content.innerHTML = `
         <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
@@ -906,11 +911,14 @@ function calculateAvg(list, count, mean=false) {
     if(list.length < count) return "-";
     let slice = list.slice(0, count); let dnfC = slice.filter(s=>s.penalty==='DNF').length;
     
-    // Trim logic: Best 5% and Worst 5% removal for large averages
+    // Trim logic: Best 5% and Worst 5% removal for large averages (standard WCA is usually just 1 best 1 worst for Ao5, Ao12)
+    // For Ao5: remove 1 best, 1 worst.
+    // For Ao12: remove 1 best, 1 worst.
+    // For Ao100: remove 5 best, 5 worst.
     let removeCount = Math.ceil(count * 0.05); // 5%
     if (count <= 12) removeCount = 1; 
 
-    if(dnfC >= removeCount + (mean?0:1)) return "DNF"; 
+    if(dnfC >= removeCount + (mean?0:1)) return "DNF"; // Rough DNF logic
 
     let nums = slice.map(s => s.penalty==='DNF'?Infinity:(s.penalty==='+2'?s.time+2000:s.time));
     if(mean) return (nums.reduce((a,b)=>a+b,0)/count/1000).toFixed(precision);
@@ -947,6 +955,8 @@ function handleEnd(e) {
         // Reset color logic for dark mode
         const isDark = document.documentElement.classList.contains('dark');
         timerEl.style.color = ''; 
+        // We rely on CSS class handling or remove inline style to revert to class-based color
+        // Removing inline style allows CSS to take over (text-slate-800 or dark:text-slate-100)
         
         timerEl.classList.remove('holding-status','ready-to-start'); 
         isReady=false; 
@@ -957,7 +967,7 @@ function handleEnd(e) {
 window.openSessionModal = () => { document.getElementById('sessionOverlay').classList.add('active'); renderSessionList(); };
 window.closeSessionModal = () => { document.getElementById('sessionOverlay').classList.remove('active'); document.getElementById('newSessionName').value = ""; editingSessionId = null; };
 
-// ... (Session Management - Logic Preserved) ...
+// ... (Session Management Functions: renderSessionList, editSessionName, saveSessionName, createNewSession, switchSession, deleteSession - kept same logic, just HTML template updated implicitly by not changing logic, but renderSessionList needs template update for Dark Mode) ...
 
 function renderSessionList() {
     const listContainer = document.getElementById('sessionList');
@@ -973,7 +983,7 @@ function renderSessionList() {
     document.getElementById('sessionCreateForm').classList.toggle('hidden', eventSessions.length >= 10);
 }
 
-// ... (Remaining window functions - Logic Preserved) ...
+// ... (Remaining window functions: editSessionName, saveSessionName, createNewSession, switchSession, deleteSession, openAvgShare, openSingleShare, closeAvgShare, copyShareText, eventListeners, showSolveDetails, closeModal, useThisScramble, document.getElementById('clearHistoryBtn').onclick - All logic preserved) ...
 window.editSessionName = (id) => { editingSessionId = id; renderSessionList(); };
 window.saveSessionName = (id) => { const input = document.getElementById('editSessionInput'); if (!input) return; const newName = input.value.trim(); if (newName) { const s = sessions[currentEvent].find(x => x.id === id); if (s) s.name = newName; } editingSessionId = null; renderSessionList(); updateUI(); saveData(); };
 window.createNewSession = () => { const nameInput = document.getElementById('newSessionName'); const name = nameInput.value.trim() || `Session ${sessions[currentEvent].length + 1}`; if (sessions[currentEvent].length >= 10) return; sessions[currentEvent].forEach(s => s.isActive = false); sessions[currentEvent].push({ id: Date.now(), name: name, isActive: true }); nameInput.value = ""; renderSessionList(); updateUI(); saveData(); timerEl.innerText = (0).toFixed(precision); resetPenalty(); };
