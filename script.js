@@ -207,7 +207,7 @@ function generateScramble() {
     generateFallbackScramble();
 }
 
-function updateTwistyPlayer() {
+async function updateTwistyPlayer() {
     const player = document.getElementById('mainPlayer');
     const noMsg = document.getElementById('noVisualizerMsg');
     const config = eventMap[currentEvent];
@@ -215,12 +215,24 @@ function updateTwistyPlayer() {
     if (config && player && activeTool === 'scramble') {
         player.style.display = 'block';
         noMsg.classList.add('hidden');
+        
+        // Ensure custom element is ready
+        await customElements.whenDefined('twisty-player');
+        
         try {
-            // Use setAttribute to be safe even if property setter is not ready
+            // Use properties directly for better reactivity
+            player.puzzle = config.puzzle;
+            player.alg = currentScramble;
+            player.visualization = "2D"; // Enforce 2D view
+        } catch(e) {
+            console.error("TwistyPlayer error", e);
+            // Fallback to attributes if property access fails
             player.setAttribute('puzzle', config.puzzle);
             player.setAttribute('alg', currentScramble);
+        } finally {
+            // Ensure visible even if error occurs
             player.classList.add('ready');
-        } catch(e) {}
+        }
     } else {
         if(player) player.style.display = 'none';
         if(noMsg) noMsg.classList.remove('hidden');
