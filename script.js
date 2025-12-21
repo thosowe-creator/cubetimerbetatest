@@ -539,7 +539,7 @@ const CubeTimerApp = {
                 'genMbfBtn', 'copyMbfBtn', 'closeMbfBtn', 'copyShareBtn', 'closeShareBtn',
                 'shareSingleBtn', 'useScrambleBtn', 'closeDetailBtn', 'closeUpdateLogBtn', 'closeStatsBtn',
                 'addSessionBtn', 'closeSessionBtn', 'btCloseBtn', 'closeSettingsBtn',
-                'mobBackupBtn', 'mobRestoreBtn' 
+                'mobBackupBtn', 'mobRestoreBtn', 'settingsOverlay' // Added missing settingsOverlay
             ];
             ids.forEach(id => {
                 const el = document.getElementById(id);
@@ -577,8 +577,10 @@ const CubeTimerApp = {
             safeAdd(document.getElementById('backupBtn'), 'click', CubeTimerApp.storage.export);
             safeAdd(document.getElementById('restoreBtn'), 'click', () => D.importInput && D.importInput.click());
             safeAdd(D.importInput, 'change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
-            safeAdd(document.getElementById('settingsBtn'), 'click', () => U.openModal('settingsOverlay'));
-            safeAdd(document.getElementById('mobSettingsBtn'), 'click', () => U.openModal('settingsOverlay'));
+            
+            // Explicit settings handlers to ensure connectivity
+            safeAdd(document.getElementById('settingsBtn'), 'click', () => { if(D.settingsOverlay) D.settingsOverlay.classList.add('active'); });
+            safeAdd(document.getElementById('mobSettingsBtn'), 'click', () => { if(D.settingsOverlay) D.settingsOverlay.classList.add('active'); });
 
             safeAdd(D.btConnectBtn, 'click', () => CubeTimerApp.bluetooth.connect());
             safeAdd(D.btDisconnectBtn, 'click', () => CubeTimerApp.bluetooth.disconnect());
@@ -1242,6 +1244,7 @@ const CubeTimerApp = {
 document.addEventListener('DOMContentLoaded', () => {
     CubeTimerApp.ui.init();
     CubeTimerApp.storage.load();
-    CubeTimerApp.ui.changeEvent('333');
+    // Start with the event loaded from storage (or default 333)
+    CubeTimerApp.ui.changeEvent(CubeTimerApp.state.currentEvent || '333');
     CubeTimerApp.utils.checkUpdateLog();
 });
