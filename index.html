@@ -30,6 +30,13 @@
         /* Mobile Bottom Nav Safe Area */
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+        
+        /* Twisty Player Customization */
+        twisty-player {
+            width: 100%;
+            height: 100%;
+            max-width: 300px;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-hidden transition-colors duration-200">
@@ -367,9 +374,10 @@
                     </div>
 
                     <div id="toolContainer" class="flex items-center justify-center min-h-[190px]">
-                        <div id="visualizerWrapper" class="w-full flex justify-center items-center">
-                            <canvas id="cubeVisualizer" width="260" height="190"></canvas>
-                            <div id="noVisualizerMsg" class="hidden text-[11px] text-slate-300 italic">Visualizer for standard cubes only</div>
+                        <!-- [CHANGED] Canvas replaced with Twisty Player for full support -->
+                        <div id="visualizerWrapper" class="w-full flex justify-center items-center h-[200px]">
+                            <twisty-player id="mainPlayer" background="none" control-panel="none" visualization="2D"></twisty-player>
+                            <div id="noVisualizerMsg" class="hidden text-[11px] text-slate-300 italic">Visualizer not available</div>
                         </div>
                         <div id="graphWrapper" class="w-full h-[190px] hidden flex flex-col p-2">
                             <div class="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-inner overflow-hidden relative">
@@ -402,6 +410,8 @@
 
     <!-- Scrambo Library for WCA Official 3x3 Scrambles -->
     <script src="https://cdn.jsdelivr.net/gh/kotarot/scrambo/scrambo.min.js"></script>
+    <!-- Cubing.js Twisty Player for Visualization -->
+    <script src="https://cdn.cubing.net/js/cubing/twisty" type="module"></script>
     <!-- 외부 스크립트 연결 -->
     <script src="script.js"></script>
 </body>
