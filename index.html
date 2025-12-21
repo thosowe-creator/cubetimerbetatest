@@ -58,7 +58,7 @@
 
     <!-- Bluetooth Modal -->
     <div id="btOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-8 modal-content">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-8 modal-content" onclick="event.stopPropagation()">
             <div class="text-center mb-6">
                 <div class="w-16 h-16 bg-blue-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <svg id="btModalIcon" class="text-blue-500" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg>
@@ -82,7 +82,7 @@
 
     <!-- Sessions Modal -->
     <div id="sessionOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 modal-content">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 modal-content" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="font-bold text-slate-700 dark:text-white text-lg">Sessions</h3>
                 <span id="sessionCountLabel" class="text-[11px] font-bold text-slate-400">0/10</span>
@@ -101,7 +101,7 @@
 
     <!-- Multi-Blind Scramble Modal -->
     <div id="mbfScrambleOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl p-6 md:p-8 flex flex-col max-h-[90vh] modal-content">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl p-6 md:p-8 flex flex-col max-h-[90vh] modal-content" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-bold text-slate-700 dark:text-white text-lg">Multi-Blind Scrambles</h3>
                 <span id="mbfCubeCountDisplay" class="text-[10px] font-bold bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-3 py-1 rounded-full uppercase tracking-tighter">10 Cubes</span>
@@ -116,7 +116,7 @@
 
     <!-- Detailed Stats Modal -->
     <div id="statsOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 modal-content">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 modal-content" onclick="event.stopPropagation()">
             <h3 class="font-bold text-slate-700 dark:text-white text-lg mb-6">Detailed Stats</h3>
             <div class="space-y-3" id="statsContent"></div>
             <button id="closeStatsBtn" class="w-full mt-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl text-sm">Close</button>
@@ -124,8 +124,8 @@
     </div>
 
     <!-- Settings Modal -->
-    <div id="settingsOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 transform transition-all scale-95 opacity-0 duration-200 modal-content" id="settingsModal">
+    <div id="settingsOverlay" class="modal-overlay" onclick="document.getElementById('closeSettingsBtn').click()">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 transform transition-all scale-95 opacity-0 duration-200 modal-content" id="settingsModal" onclick="event.stopPropagation()">
             <h3 class="font-bold text-slate-700 dark:text-white text-lg mb-6">Settings</h3>
             <div class="space-y-4">
                 <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl">
@@ -174,7 +174,7 @@
 
     <!-- Avg Share Modal -->
     <div id="avgShareOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl p-8 modal-content">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl p-8 modal-content" onclick="event.stopPropagation()">
             <div class="flex flex-col mb-6">
                 <h4 class="font-bold text-blue-500 uppercase text-[10px] tracking-widest mb-1">[CubeTimer]</h4>
                 <p id="shareDate" class="text-slate-400 text-xs font-bold mb-4">Date : -</p>
@@ -193,7 +193,7 @@
 
     <!-- Solve Detail Modal -->
     <div id="modalOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl p-6 modal-content">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl p-6 modal-content" onclick="event.stopPropagation()">
             <h4 class="font-bold text-slate-400 uppercase text-[10px] tracking-widest mb-4">Solve Details</h4>
             <div id="modalTime" class="text-3xl font-bold text-slate-800 dark:text-white mb-1">0.00</div>
             <div id="modalEvent" class="text-[10px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded w-fit mb-4">3x3x3</div>
@@ -213,7 +213,7 @@
 
     <!-- Update Log Modal -->
     <div id="updateLogOverlay" class="modal-overlay">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 modal-content">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-6 modal-content" onclick="event.stopPropagation()">
             <div class="flex items-center gap-2 mb-6">
                 <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-xl">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600 dark:text-blue-400"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
