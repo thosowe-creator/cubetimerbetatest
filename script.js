@@ -17,17 +17,15 @@ let holdDuration = 300; // ms
 let wakeLock = null;
 let isWakeLockEnabled = false;
 
-// Inspection Logic Vars
 let isInspectionMode = false;
-let inspectionState = 'none'; // 'none', 'inspecting', 'holding'
+let inspectionState = 'none'; 
 let inspectionStartTime = 0;
 let inspectionInterval = null;
-let inspectionPenalty = null; // null, '+2', 'DNF'
+let inspectionPenalty = null; 
 let hasSpoken8 = false;
 let hasSpoken12 = false;
 let lastStopTimestamp = 0;
 
-// Update Log Configuration
 const APP_VERSION = '1.3.2'; 
 const UPDATE_LOGS = [
     "V1.3.2 외부 라이브러리 연결 안정화",
@@ -35,7 +33,6 @@ const UPDATE_LOGS = [
     "평면도 시각화 투명도 문제 해결"
 ];
 
-// Lazy Loading Vars
 let displayedSolvesCount = 50;
 const SOLVES_BATCH_SIZE = 50;
 
@@ -44,6 +41,7 @@ let btCharacteristic = null;
 let isBtConnected = false;
 let lastBtState = null;
 
+// DOM Elements
 const timerEl = document.getElementById('timer');
 const scrambleEl = document.getElementById('scramble');
 const mbfInputArea = document.getElementById('mbfInputArea');
@@ -69,7 +67,6 @@ const holdDurationSlider = document.getElementById('holdDurationSlider');
 const holdDurationValue = document.getElementById('holdDurationValue');
 const inspectionToggle = document.getElementById('inspectionToggle');
 
-// UI Sections for Mobile Tab Switching
 const timerSection = document.getElementById('timerSection');
 const historySection = document.getElementById('historySection');
 const mobTabTimer = document.getElementById('mob-tab-timer');
@@ -288,12 +285,8 @@ async function updateTwistyPlayer() {
         player.style.display = 'block';
         noMsg.classList.add('hidden');
         
-        // [FIX] 타임아웃을 추가하여 라이브러리가 로드되지 않아도 멈추지 않게 함
-        const timeout = new Promise((resolve) => setTimeout(resolve, 500));
-        await Promise.race([
-            customElements.whenDefined('twisty-player'),
-            timeout
-        ]);
+        // Ensure custom element is ready
+        await customElements.whenDefined('twisty-player');
         
         try {
             // Use properties directly for better reactivity
