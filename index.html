@@ -31,8 +31,9 @@
             width: 100%;
             height: 100%;
             max-width: 300px;
-            opacity: 1; /* 항상 보이게 설정 */
-            pointer-events: none; /* 드래그 방지 */
+            /* 초기 투명도 제거 */
+            opacity: 1; 
+            pointer-events: none; /* 터치 간섭 방지 */
         }
     </style>
 </head>
@@ -225,7 +226,7 @@
             </div>
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-3">
-                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.3.2</span>
+                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.3.3</span>
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Latest</span>
                 </div>
                 <ul id="updateList" class="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 marker:text-blue-500 list-disc pl-4"></ul>
@@ -389,15 +390,13 @@
         </button>
     </nav>
 
-    <!-- External Libraries (CDN URL Correction) -->
-    <!-- [FIX] Unpkg URL for Scrambo (v2.0.0 is stable) -->
+    <!-- External Libraries -->
+    <!-- Scrambo Library -->
     <script src="https://unpkg.com/scrambo/scrambo.min.js"></script>
-    <!-- [FIX] Official Cubing.js Module (Module Import Syntax) -->
-    <script type="module">
-        import "https://cdn.cubing.net/js/cubing/twisty";
-    </script>
+    <!-- Twisty Player -->
+    <script src="https://cdn.cubing.net/js/cubing/twisty" type="module"></script>
     
-    <!-- App Script (Loaded after libraries) -->
+    <!-- App Script -->
     <script src="script.js"></script>
 </body>
 </html>
