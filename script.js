@@ -16,7 +16,7 @@ let activeTool = 'scramble';
 let holdDuration = 300; // ms
 let wakeLock = null;
 let isWakeLockEnabled = false;
-let scrambler; // [FIX] Scrambo 인스턴스 재사용을 위한 전역 변수
+// let scrambler; // [삭제] 전역 변수 제거 (매번 새로 생성하여 랜덤성 보장)
 
 // Inspection Logic Vars
 let isInspectionMode = false;
@@ -849,14 +849,13 @@ function generate3bldScrambleText() {
 function generateScramble() {
     const conf = configs[currentEvent]; if (!conf || currentEvent === '333mbf') return;
     
-    // [FIX] Scrambo 3x3x3 Official Logic Refined
+    // [FIXED] Scrambo 3x3x3 Official Logic
+    // 매번 새로운 Scrambo 인스턴스를 생성하여 랜덤 시드가 갱신되도록 보장
     if (currentEvent === '333' && typeof Scrambo !== 'undefined') {
         try {
-            if (!scrambler) scrambler = new Scrambo(); 
-            // get() 호출 시마다 새로운 랜덤 스크램블을 가져옴
-            currentScramble = scrambler.type('333').get()[0];
+            const s = new Scrambo(); 
+            currentScramble = s.type('333').get()[0];
             
-            // 성공했다면 시각화 및 종료 (return으로 아래 랜덤 무브 로직 방지)
             scrambleEl.innerText = currentScramble;
             if (conf.n) { initCube(conf.n); currentScramble.split(/\s+/).filter(s => s && !orientations.includes(s) && s!=='y2').forEach(applyMove); drawCube(); }
             resetPenalty();
@@ -1276,7 +1275,50 @@ window.openAvgShare = (type) => { const sid = getCurrentSessionId(); const count
 window.openSingleShare = () => { const s = solves.find(x => x.id === selectedSolveId); if (!s) return; closeModal(); const dateStr = s.date || new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, ""); document.getElementById('shareDate').innerText = `Date : ${dateStr}.`; document.getElementById('shareLabel').innerText = `Single :`; document.getElementById('shareAvg').innerText = s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time) + (s.penalty==='+2'?'+':''); const listContainer = document.getElementById('shareList'); listContainer.innerHTML = `<div class="flex flex-col p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-slate-400 w-4">1.</span><span class="font-bold text-slate-800 dark:text-slate-200 text-sm min-w-[50px]">${s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span><span class="text-[10px] text-slate-400 font-medium italic truncate flex-grow">${s.scramble}</span></div></div>`; document.getElementById('avgShareOverlay').classList.add('active'); };
 window.closeAvgShare = () => document.getElementById('avgShareOverlay').classList.remove('active');
 window.copyShareText = () => { const date = document.getElementById('shareDate').innerText; const avgLabel = document.getElementById('shareLabel').innerText; const avgVal = document.getElementById('shareAvg').innerText; const isSingle = avgLabel.includes('Single'); let text = `[CubeTimer]\n\n${date}\n\n${avgLabel} ${avgVal}\n\n`; if (isSingle) { const s = solves.find(x => x.id === selectedSolveId); if (s) text += `1. ${avgVal}   ${s.scramble}\n`; } else { const count = avgLabel.includes('5') ? 5 : (avgLabel.includes('3') ? 3 : 12); const sid = getCurrentSessionId(); const filtered = solves.filter(s => s.event === currentEvent && s.sessionId === sid).slice(0, count); filtered.reverse().forEach((s, i) => { text += `${i+1}. ${s.penalty==='DNF'?'DNF':formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}   ${s.scramble}\n`; }); } const textArea = document.createElement("textarea"); textArea.value = text; document.body.appendChild(textArea); textArea.select(); try { document.execCommand('copy'); const btn = document.querySelector('[onclick="copyShareText()"]'); const original = btn.innerHTML; btn.innerHTML = "Copied!"; btn.classList.add('bg-green-600'); setTimeout(() => { btn.innerHTML = original; btn.classList.remove('bg-green-600'); }, 2000); } catch (err) { console.error('Copy failed', err); } document.body.removeChild(textArea); };
-window.addEventListener('keydown', e => { if(editingSessionId || document.activeElement.tagName === 'INPUT') { if(e.code === 'Enter' && document.activeElement === manualInput) {} else { return; } } if(e.code==='Space' && !e.repeat) { e.preventDefault(); handleStart(); } if(isManualMode && e.code==='Enter') { let v = parseFloat(manualInput.value); if(v>0) { solves.unshift({ id:Date.now(), time:v*1000, scramble:currentScramble, event:currentEvent, sessionId: getCurrentSessionId(), penalty:null, date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, "") }); manualInput.value=""; updateUI(); generateScramble(); saveData(); } } });
+
+// [FIX] 입력 요소가 '화면에 보일 때(offsetParent !== null)'만 키 입력을 차단하도록 수정
+// 브라우저가 숨겨진 input에 포커스를 주더라도 타이머(스페이스바)가 작동하게 됩니다.
+window.addEventListener('keydown', e => { 
+    const activeEl = document.activeElement;
+    // 태그가 INPUT이고, 실제로 화면에 공간을 차지하고 있을 때만 '입력 중'으로 간주
+    const isVisibleInput = activeEl.tagName === 'INPUT' && activeEl.offsetParent !== null;
+
+    if(editingSessionId || isVisibleInput) { 
+        if(e.code === 'Enter' && activeEl === manualInput) {
+            // 매뉴얼 입력창에서 엔터는 허용
+        } else { 
+            return; // 그 외 상황에서는 타이머 로직 차단
+        } 
+    } 
+    
+    if(e.code==='Space' && !e.repeat) { 
+        // [FIX] 만약 포커스가 버튼이나 링크 등(입력창 아님)에 가 있다면 포커스를 해제하고 타이머 실행
+        if (activeEl.tagName === 'BUTTON' || activeEl.tagName === 'A') {
+            activeEl.blur();
+        }
+        e.preventDefault(); 
+        handleStart(); 
+    } 
+    
+    if(isManualMode && e.code==='Enter') { 
+        let v = parseFloat(manualInput.value); 
+        if(v>0) { 
+            solves.unshift({ 
+                id:Date.now(), 
+                time:v*1000, 
+                scramble:currentScramble, 
+                event:currentEvent, 
+                sessionId: getCurrentSessionId(), 
+                penalty:null, 
+                date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, "") 
+            }); 
+            manualInput.value=""; 
+            updateUI(); 
+            generateScramble(); 
+            saveData(); 
+        } 
+    } 
+});
 window.addEventListener('keyup', e => { if(e.code==='Space' && !editingSessionId) handleEnd(); });
 const interactiveArea = document.getElementById('timerInteractiveArea');
 interactiveArea.addEventListener('touchstart', handleStart, { passive: false });
