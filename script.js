@@ -28,11 +28,11 @@ let hasSpoken12 = false;
 let lastStopTimestamp = 0;
 
 // Update Log Configuration
-const APP_VERSION = '1.3.1'; 
+const APP_VERSION = '1.3.2'; 
 const UPDATE_LOGS = [
-    "V1.3.1 스크램블 생성 및 평면도 오류 긴급 수정",
-    "모든 종목 WCA 공식 스크램블(Random State) 지원",
-    "스페이스바 및 모바일 터치 오작동 해결"
+    "V1.3.2 외부 라이브러리 연결 안정화",
+    "스크램블 미표시 버그 수정 (Fallback Logic)",
+    "평면도 시각화 투명도 문제 해결"
 ];
 
 // Lazy Loading Vars
@@ -113,7 +113,9 @@ const eventMap = {
     '333mbf': { puzzle: '3x3x3', type: '333', cat: 'blind' }
 };
 
-// --- Mobile Tab Logic ---
+// ... (Mobile Logic, Update Log, Inspection, Dark Mode, Wake Lock, BT Logic preserved) ...
+// (Function implementations identical to previous versions unless noted)
+
 window.switchMobileTab = (tab) => {
     if (tab === 'timer') {
         timerSection.classList.remove('hidden'); historySection.classList.add('hidden');
@@ -130,6 +132,76 @@ window.addEventListener('resize', () => {
     if (window.innerWidth >= 768) { timerSection.classList.remove('hidden'); historySection.classList.remove('hidden'); historySection.classList.add('flex'); }
     else { if (mobTabTimer.classList.contains('text-blue-600') || mobTabTimer.classList.contains('text-blue-400')) switchMobileTab('timer'); else switchMobileTab('history'); }
 });
+function checkUpdateLog() {
+    const savedVersion = localStorage.getItem('appVersion');
+    if (savedVersion !== APP_VERSION) {
+        document.getElementById('updateVersion').innerText = `v${APP_VERSION}`;
+        document.getElementById('updateList').innerHTML = UPDATE_LOGS.map(log => `<li>${log}</li>`).join('');
+        document.getElementById('updateLogOverlay').classList.add('active');
+    }
+}
+window.closeUpdateLog = () => { document.getElementById('updateLogOverlay').classList.remove('active'); localStorage.setItem('appVersion', APP_VERSION); };
+function toggleInspection(checkbox) {
+    isInspectionMode = checkbox.checked;
+    if (isInspectionMode) { updateHoldDuration(0.01); holdDurationSlider.value = 0.01; holdDurationSlider.disabled = true; document.getElementById('holdDurationContainer').classList.add('opacity-50', 'pointer-events-none'); } 
+    else { updateHoldDuration(0.3); holdDurationSlider.value = 0.3; holdDurationSlider.disabled = false; document.getElementById('holdDurationContainer').classList.remove('opacity-50', 'pointer-events-none'); }
+    saveData();
+}
+function startInspection() {
+    inspectionState = 'inspecting'; inspectionStartTime = Date.now(); inspectionPenalty = null; hasSpoken8 = false; hasSpoken12 = false;
+    timerEl.classList.remove('text-ready'); timerEl.style.color = '#ef4444'; statusHint.innerText = "Inspection";
+    if(inspectionInterval) clearInterval(inspectionInterval);
+    inspectionInterval = setInterval(() => {
+        const elapsed = (Date.now() - inspectionStartTime) / 1000; const remaining = 15 - elapsed;
+        if (remaining > 0) timerEl.innerText = Math.ceil(remaining); else if (remaining > -2) { timerEl.innerText = "+2"; inspectionPenalty = '+2'; } else { timerEl.innerText = "DNF"; inspectionPenalty = 'DNF'; }
+        if (elapsed >= 8 && !hasSpoken8) { speak("Eight seconds"); hasSpoken8 = true; } if (elapsed >= 12 && !hasSpoken12) { speak("Twelve seconds"); hasSpoken12 = true; }
+    }, 100);
+}
+function stopInspection() {
+    if(inspectionInterval) clearInterval(inspectionInterval); inspectionState = 'none'; timerEl.style.color = '';
+    if (isInspectionMode && inspectionStartTime > 0) { const elapsed = (Date.now() - inspectionStartTime) / 1000; if (elapsed > 17) inspectionPenalty = 'DNF'; else if (elapsed > 15) inspectionPenalty = '+2'; else inspectionPenalty = null; }
+}
+function speak(text) { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 1.2; window.speechSynthesis.speak(u); } }
+function toggleDarkMode(checkbox) { document.documentElement.classList.toggle('dark', checkbox.checked); saveData(); if(activeTool === 'graph') renderHistoryGraph(); }
+async function requestWakeLock() { try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => {}); } } catch (err) {} }
+async function toggleWakeLock(checkbox) { isWakeLockEnabled = checkbox.checked; if (isWakeLockEnabled) await requestWakeLock(); else if (wakeLock) { await wakeLock.release(); wakeLock = null; } saveData(); }
+document.addEventListener('visibilitychange', async () => { if (wakeLock !== null && document.visibilityState === 'visible' && isWakeLockEnabled) await requestWakeLock(); });
+function updateHoldDuration(val) { holdDuration = parseFloat(val) * 1000; holdDurationValue.innerText = val < 0.1 ? "Instant" : val + "s"; saveData(); }
+window.openBTModal = () => document.getElementById('btOverlay').classList.add('active');
+window.closeBTModal = () => document.getElementById('btOverlay').classList.remove('active');
+async function connectGanTimer() {
+    const btBtn = document.getElementById('btConnectBtn'); const btStatusText = document.getElementById('btStatusText'); const btIcon = document.getElementById('btModalIcon');
+    if (!navigator.bluetooth) { btStatusText.innerText = "No Bluetooth Support"; return; }
+    try {
+        btBtn.disabled = true; btBtn.innerText = "Searching..."; btStatusText.innerText = "Select GAN Timer"; btIcon.classList.add('bt-pulse');
+        btDevice = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'GAN' }], optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb'] });
+        const server = await btDevice.gatt.connect(); const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        btCharacteristic = await service.getCharacteristic('0000fff5-0000-1000-8000-00805f9b34fb'); await btCharacteristic.startNotifications();
+        btCharacteristic.addEventListener('characteristicvaluechanged', handleGanBTData);
+        isBtConnected = true; document.getElementById('btStatusIcon').classList.replace('disconnected', 'connected'); document.getElementById('btInfoPanel').classList.remove('hidden'); document.getElementById('btDeviceName').innerText = btDevice.name; document.getElementById('btDisconnectBtn').classList.remove('hidden'); btBtn.classList.add('hidden'); btStatusText.innerText = "Timer Connected"; btIcon.classList.remove('bt-pulse'); statusHint.innerText = "Timer Ready (BT)"; btDevice.addEventListener('gattserverdisconnected', onBTDisconnected);
+    } catch (error) { btStatusText.innerText = "Connection failed"; btBtn.disabled = false; btBtn.innerText = "Connect Timer"; btIcon.classList.remove('bt-pulse'); }
+}
+function handleGanBTData(event) {
+    const data = event.target.value; if (data.byteLength < 4) return; const state = data.getUint8(3);
+    if (state !== 3 && !isRunning && data.byteLength >= 8) { const min = data.getUint8(4); const sec = data.getUint8(5); const msec = data.getUint16(6, true); timerEl.innerText = formatTime((min * 60000) + (sec * 1000) + msec); }
+    if (state !== lastBtState) {
+        if (state === 6 && !isInspectionMode) { isReady = false; timerEl.classList.add('text-ready'); statusHint.innerText = "Ready!"; }
+        else if (state === 2 && !isInspectionMode) { timerEl.classList.remove('text-ready', 'text-running'); statusHint.innerText = "Timer Ready (BT)"; }
+        else if (state === 3 && !isRunning) { if (isInspectionMode && inspectionState === 'inspecting') stopInspection(); startTime = Date.now(); isRunning = true; if(timerInterval) clearInterval(timerInterval); timerInterval = setInterval(() => { timerEl.innerText = formatTime(Date.now() - startTime); }, 16); timerEl.classList.remove('text-ready'); timerEl.classList.add('text-running'); statusHint.innerText = "Timing..."; }
+        else if (state === 4 && isRunning) { clearInterval(timerInterval); isRunning = false; if (data.byteLength >= 8) { const min = data.getUint8(4); const sec = data.getUint8(5); const msec = data.getUint16(6, true); const finalMs = (min * 60000) + (sec * 1000) + msec; timerEl.innerText = formatTime(finalMs); stopTimer(finalMs); } timerEl.classList.remove('text-running'); statusHint.innerText = "Finished"; }
+        lastBtState = state;
+    }
+}
+function disconnectBT() { if (btDevice && btDevice.gatt.connected) btDevice.gatt.disconnect(); }
+function onBTDisconnected() { isBtConnected = false; lastBtState = null; document.getElementById('btStatusIcon').classList.replace('connected', 'disconnected'); document.getElementById('btInfoPanel').classList.add('hidden'); document.getElementById('btDisconnectBtn').classList.add('hidden'); const btBtn = document.getElementById('btConnectBtn'); btBtn.classList.remove('hidden'); btBtn.disabled = false; btBtn.innerText = "Connect Timer"; document.getElementById('btStatusText').innerText = "Disconnected"; statusHint.innerText = "Hold to Ready"; }
+
+// --- Timer Control ---
+function startTimer() { if(inspectionInterval) clearInterval(inspectionInterval); inspectionState = 'none'; startTime = Date.now(); isRunning = true; timerInterval = setInterval(()=> { timerEl.innerText = formatTime(Date.now()-startTime); }, 10); timerEl.style.color = ''; statusHint.innerText = "Timing..."; timerEl.classList.add('text-running'); timerEl.classList.remove('text-ready'); }
+function stopTimer(forcedTime = null) {
+    clearInterval(timerInterval); let elapsed = forcedTime !== null ? forcedTime : (Date.now() - startTime); lastStopTimestamp = Date.now(); let finalPenalty = inspectionPenalty;
+    if (elapsed > 10 || finalPenalty === 'DNF') { solves.unshift({ id: Date.now(), time: elapsed, scramble: currentScramble, event: currentEvent, sessionId: getCurrentSessionId(), penalty: finalPenalty, date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\.$/, "") }); if (finalPenalty === 'DNF') timerEl.innerText = "DNF"; else { let displayTime = formatTime(elapsed); if (finalPenalty === '+2') displayTime = formatTime(elapsed + 2000) + "+"; timerEl.innerText = displayTime; } }
+    isRunning = isReady = false; inspectionState = 'none'; inspectionPenalty = null; updateUI(); generateScramble(); statusHint.innerText = isBtConnected ? "Ready (Bluetooth)" : (isInspectionMode ? "Start Inspection" : "Hold to Ready"); timerEl.classList.remove('text-running', 'text-ready'); timerEl.style.color = ''; saveData();
+}
 
 // --- Scramble & Visualization Logic (Robust Fallback) ---
 function generateFallbackScramble() {
@@ -216,12 +288,16 @@ async function updateTwistyPlayer() {
         player.style.display = 'block';
         noMsg.classList.add('hidden');
         
-        // Ensure custom element is ready
-        await customElements.whenDefined('twisty-player');
+        // [FIX] 타임아웃을 추가하여 라이브러리가 로드되지 않아도 멈추지 않게 함
+        const timeout = new Promise((resolve) => setTimeout(resolve, 500));
+        await Promise.race([
+            customElements.whenDefined('twisty-player'),
+            timeout
+        ]);
         
         try {
             // Use properties directly for better reactivity
-            player.puzzle = config.puzzle;
+            if (player.puzzle !== config.puzzle) player.puzzle = config.puzzle;
             player.alg = currentScramble;
             player.visualization = "2D"; // Enforce 2D view
         } catch(e) {
