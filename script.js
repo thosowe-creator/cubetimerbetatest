@@ -1,7 +1,6 @@
 /**
  * Cube Timer Application
  * Refactored for maintainability and modularity.
- * No UI/UX changes were made.
  */
 
 const CubeTimerApp = {
@@ -202,7 +201,7 @@ const CubeTimerApp = {
             if (CubeTimerApp.state.activeTool === 'graph') CubeTimerApp.ui.renderGraph();
         },
 
-        // --- Specific Generator Logic (Refactored) ---
+        // --- Specific Generator Logic ---
         generateMinx(res) {
             for (let i = 0; i < 7; i++) {
                 let line = [];
@@ -216,9 +215,6 @@ const CubeTimerApp = {
             }
         },
         generateClock(res) {
-            const dials = ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"];
-            dials.forEach(d => res.push(`${d}${Math.floor(Math.random() * 12) - 5}${Math.floor(Math.random() * 12) - 5 >= 0 ? '+' : ''}`)); // Fixed logic slightly to match original behavior but concise
-            // Revert to strict original logic for safety
             res.length = 0;
             ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"].forEach(d => {
                 const v = Math.floor(Math.random() * 12) - 5;
@@ -479,6 +475,12 @@ const CubeTimerApp = {
         },
         disconnect() {
             if (this.device && this.device.gatt.connected) this.device.gatt.disconnect();
+            
+            // Safety stop if still running via JS loop
+            if (CubeTimerApp.state.isRunning) {
+                CubeTimerApp.timer.stop();
+            }
+            
             CubeTimerApp.state.isBtConnected = false;
             CubeTimerApp.state.lastBtState = null;
             CubeTimerApp.ui.updateBTUI(false);
@@ -629,11 +631,13 @@ const CubeTimerApp = {
 
             // Delegated Events
             document.getElementById('categoryTabs').addEventListener('click', (e) => {
-                if(e.target.classList.contains('category-btn')) this.switchCategory(e.target.dataset.cat);
+                const btn = e.target.closest('.category-btn');
+                if(btn) this.switchCategory(btn.dataset.cat);
             });
             document.querySelectorAll('.event-group').forEach(grp => {
                 grp.addEventListener('click', (e) => {
-                    if(e.target.classList.contains('event-tab')) this.changeEvent(e.target.dataset.event);
+                    const tab = e.target.closest('.event-tab');
+                    if(tab) this.changeEvent(tab.dataset.event);
                 });
             });
             D.sessionList.addEventListener('click', this.handleSessionListClick.bind(this));
@@ -645,7 +649,8 @@ const CubeTimerApp = {
             
             document.getElementById('toolsMenuBtn').addEventListener('click', (e) => { e.stopPropagation(); D.toolsDropdown.classList.toggle('show'); });
             D.toolsDropdown.addEventListener('click', (e) => {
-                if(e.target.classList.contains('tool-option')) this.selectTool(e.target.dataset.tool);
+                const opt = e.target.closest('.tool-option');
+                if(opt) this.selectTool(opt.dataset.tool);
             });
             window.addEventListener('click', () => D.toolsDropdown.classList.remove('show'));
 
@@ -662,9 +667,10 @@ const CubeTimerApp = {
             overlay.addEventListener('click', (e) => { if(e.target === overlay) CubeTimerApp.utils.closeModal(overlayId); });
         },
 
-        // --- Event Handlers (Logic moved from global) ---
+        // --- Event Handlers (Fixed) ---
         handleStart(e) {
-            if (e.target.closest('.avg-badge') || e.target.closest('button') || e.target.closest('.tools-dropdown')) return;
+            // [Fix 1] Check existence of e before accessing e.target
+            if (e && e.target && (e.target.closest('.avg-badge') || e.target.closest('button') || e.target.closest('.tools-dropdown'))) return;
             const S = CubeTimerApp.state;
             if (S.isBtConnected && !S.isInspectionMode) return;
             if (e && e.cancelable) e.preventDefault();
@@ -717,10 +723,20 @@ const CubeTimerApp = {
 
         handleKeydown(e) {
             const S = CubeTimerApp.state;
+            // [Fix 4] Manual Input Fix
             if (S.editingSessionId || document.activeElement.tagName === 'INPUT') {
-                if (e.code === 'Enter' && document.activeElement === CubeTimerApp.dom.manualInput) { /* allowed */ } else return;
+                if (e.code === 'Enter' && document.activeElement === CubeTimerApp.dom.manualInput) {
+                    // Manual input Enter is handled below, let it pass
+                } else {
+                    return; 
+                }
             }
-            if (e.code === 'Space' && !e.repeat) { e.preventDefault(); this.handleStart(); }
+            
+            if (e.code === 'Space' && !e.repeat) { 
+                e.preventDefault(); 
+                this.handleStart(); // Called without args, e checks handled inside
+            }
+            
             if (S.isManualMode && e.code === 'Enter') {
                 let v = parseFloat(CubeTimerApp.dom.manualInput.value);
                 if (v > 0) CubeTimerApp.timer.stop(v * 1000);
@@ -1177,11 +1193,6 @@ const CubeTimerApp = {
         },
         clearHistory() {
             const sid = CubeTimerApp.storage.getCurrentSessionId();
-            if(!confirm('Clear all history for this session?')) return; // Replaced custom modal with native for brevity in utils, or re-implement if strict UI match needed. 
-            // *Correction*: User asked to maintain UI. I will stick to original logic if possible, but for clean code, native confirm is acceptable or I replicate the modal logic.
-            // Let's replicate the logic inline to avoid adding HTML.
-            
-            // Re-creating the custom confirmation logic from original code to maintain UI fidelity
             const msg = `Clear all history for this session?`;
             const div = document.createElement('div');
             div.innerHTML = `<div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"><div class="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-xs shadow-2xl"><p class="text-sm font-bold text-slate-700 dark:text-white mb-6 text-center">${msg}</p><div class="flex gap-2"><button id="cancelClear" class="flex-1 py-3 text-slate-400 font-bold text-sm">Cancel</button><button id="confirmClear" class="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold text-sm">Clear All</button></div></div></div>`;
