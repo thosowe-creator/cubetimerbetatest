@@ -1160,9 +1160,9 @@ function calculateAvg(list, count, mean=false) {
 
 // --- Interaction Logic with configurable Hold Time ---
 function handleStart(e) {
+    // [FIX] e가 존재할 때만 타겟 검사 (키보드 실행 시 e는 undefined일 수 있음)
     // [FIX] Ignore touches on interactive elements like badges or buttons
-    // This allows clicking on stats/settings without triggering the timer
-    if (e.target.closest('.avg-badge') || e.target.closest('button') || e.target.closest('.tools-dropdown')) return;
+    if (e && (e.target.closest('.avg-badge') || e.target.closest('button') || e.target.closest('.tools-dropdown'))) return;
 
     if (isBtConnected && !isInspectionMode) return; 
     
