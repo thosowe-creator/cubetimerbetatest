@@ -29,11 +29,12 @@ let hasSpoken12 = false;
 let lastStopTimestamp = 0;
 
 // Update Log Configuration
-const APP_VERSION = '1.1'; 
+const APP_VERSION = '1.2'; 
 const UPDATE_LOGS = [
-    "V1.1 모바일 UI 개편",
-    "Gan Halo Timer 사용 시 소숫점이 반올림되던 현상 수정",
-    "인스펙션 기능 추가",
+    "V1.2 모든 종목 WCA 공식 스크램블(Random State) 적용",
+    "Square-1 및 특수 큐브 스크램블 오류 수정",
+    "모바일 터치 및 스페이스바 입력 문제 해결",
+    "인스펙션 기능 안정화"
 ];
 
 // Lazy Loading Vars
@@ -849,49 +850,74 @@ function generate3bldScrambleText() {
 function generateScramble() {
     const conf = configs[currentEvent]; if (!conf || currentEvent === '333mbf') return;
     
-    // [FIXED] Scrambo 3x3x3 Official Logic
-    // 매번 새로운 Scrambo 인스턴스를 생성하여 랜덤 시드가 갱신되도록 보장
-    if (currentEvent === '333' && typeof Scrambo !== 'undefined') {
+    // [UPDATED] Use Scrambo for ALL supported events
+    // Maps internal event codes to Scrambo types
+    const scramboMap = {
+        '333': '333', '333oh': '333', '333bf': '333',
+        '222': '222',
+        '444': '444', '444bf': '444',
+        '555': '555', '555bf': '555',
+        '666': '666',
+        '777': '777',
+        'minx': 'minx',
+        'pyra': 'pyraminx',
+        'skewb': 'skewb',
+        'sq1': 'sq1',
+        'clock': 'clock'
+    };
+
+    if (typeof Scrambo !== 'undefined' && scramboMap[currentEvent]) {
         try {
-            const s = new Scrambo(); 
-            currentScramble = s.type('333').get()[0];
+            // Re-instantiate to ensure fresh seed and avoid stale state
+            const s = new Scrambo();
+            currentScramble = s.type(scramboMap[currentEvent]).get()[0];
             
             scrambleEl.innerText = currentScramble;
-            if (conf.n) { initCube(conf.n); currentScramble.split(/\s+/).filter(s => s && !orientations.includes(s) && s!=='y2').forEach(applyMove); drawCube(); }
+            
+            // Visualization Logic
+            if (conf.n) { 
+                initCube(conf.n); 
+                // Filter and apply moves. Note: Scrambo outputs standard notation.
+                // Ignore rotations 'y2' etc. for visualization purposes if present.
+                currentScramble.split(/\s+/).filter(m => m && !orientations.includes(m) && m !== 'y2').forEach(applyMove); 
+                drawCube(); 
+            } else {
+                // Clear visualizer for non-NxN events (minx, clock, sq1, etc.)
+                visualizerCanvas.style.display='none'; 
+                noVisualizerMsg.classList.remove('hidden'); 
+                noVisualizerMsg.innerText = "Visualizer for standard cubes only";
+            }
+            
             resetPenalty();
             if (activeTool === 'graph') renderHistoryGraph();
-            return; 
+            return; // Successfully used Scrambo, exit function
         } catch(e) {
             console.warn("Scrambo failed, falling back to random moves", e);
         }
     }
     
+    // --- Fallback Manual Logic (Executed only if Scrambo fails or event not supported) ---
     let res = [];
     
     if (currentEvent === 'minx') {
-        // Megaminx: Pochmann style, optimized
-        // 7 lines of R++ D++ ...
+        // Megaminx Fallback
         for (let i = 0; i < 7; i++) {
             let line = [];
-            // 10 moves per line (5 pairs of R/D)
             for (let j = 0; j < 10; j++) {
-                // WCA style: R++ or R--, D++ or D--
-                // Usually alternating R and D
                 const type = (j % 2 === 0) ? "R" : "D";
                 const suffix = (Math.random() < 0.5) ? "++" : "--";
                 line.push(type + suffix);
             }
-            // End with U or U'
             line.push(Math.random() < 0.5 ? "U" : "U'");
             res.push(line.join(" "));
         }
         currentScramble = res.join("\n");
         
     } else if (currentEvent === 'clock') {
-        // WCA Clock Notation
+        // Clock Fallback
         const dials = ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"];
         dials.forEach(d => {
-            const v = Math.floor(Math.random() * 12) - 5; // -5 to 6
+            const v = Math.floor(Math.random() * 12) - 5; 
             res.push(`${d}${v >= 0 ? '+' : ''}${v}`);
         });
         res.push("y2");
@@ -900,7 +926,6 @@ function generateScramble() {
             const v = Math.floor(Math.random() * 12) - 5;
             res.push(`${d}${v >= 0 ? '+' : ''}${v}`);
         });
-        // Pins: Randomly up or down
         let pins = [];
         ["UR", "DR", "DL", "UL"].forEach(p => {
             if (Math.random() < 0.5) pins.push(p);
@@ -909,13 +934,13 @@ function generateScramble() {
         currentScramble = res.join(" ");
         
     } else if (currentEvent === 'sq1') {
-        // Square-1 Simulation Logic (Truncated for brevity, same as before)
-        // ... (Logic remains identical to previous version, ensuring standard randomness)
+        // [FIXED] Square-1 Fallback with Loop Safety
         let topCuts = [true, false, true, true, false, true, true, false, true, true, false, true];
         let botCuts = [true, false, true, true, false, true, true, false, true, true, false, true]; 
         
         let movesCount = 0;
         let scrambleOps = [];
+        let attempts = 0; // Safety counter
         
         const rotateArray = (arr, amt) => {
             const n = 12;
@@ -925,7 +950,8 @@ function generateScramble() {
             arr.unshift(...spliced);
         };
 
-        while (movesCount < 12) {
+        while (movesCount < 12 && attempts < 1000) { // Limit attempts to prevent freeze
+            attempts++;
             let u = Math.floor(Math.random() * 12) - 5;
             let d = Math.floor(Math.random() * 12) - 5;
             if (u === 0 && d === 0) continue;
@@ -949,6 +975,7 @@ function generateScramble() {
         currentScramble = scrambleOps.join(" ");
 
     } else if (['pyra', 'skewb'].includes(currentEvent)) {
+        // Pyra/Skewb Fallback
         let last = "";
         for (let i = 0; i < conf.len; i++) {
             let m;
@@ -964,7 +991,7 @@ function generateScramble() {
         currentScramble = res.join(" ");
         
     } else {
-        // NxN Logic (Same as before)
+        // NxN Fallback
         let lastAxis = -1;
         let secondLastAxis = -1;
         let lastMoveBase = "";
@@ -1006,20 +1033,32 @@ function generateScramble() {
         currentScramble = res.join(" ");
     }
     
+    // Finalize Fallback Scramble
     scrambleEl.innerText = currentScramble;
     if (conf.n) { initCube(conf.n); currentScramble.split(/\s+/).filter(s => s && !orientations.includes(s) && s!=='y2').forEach(applyMove); drawCube(); } else { cubeState={}; drawCube(); }
     resetPenalty();
     if (activeTool === 'graph') renderHistoryGraph();
 }
 
+// [UPDATED] MBF Scrambles now use Scrambo library if available
 window.generateMbfScrambles = () => {
     const count = parseInt(mbfCubeInput.value);
     if (!count || count < 2 || count > 100) return;
     const listContainer = document.getElementById('mbfScrambleList');
     document.getElementById('mbfCubeCountDisplay').innerText = `${count} Cubes`;
     listContainer.innerHTML = "";
+    
+    let scrambles = [];
+    if (typeof Scrambo !== 'undefined') {
+        try {
+            // Get 'count' number of 333 scrambles
+            scrambles = new Scrambo().type('333').get(count);
+        } catch(e) { console.warn("MBF Scrambo failed", e); }
+    }
+
     for (let i = 1; i <= count; i++) {
-        const scr = generate3bldScrambleText();
+        // Use library scramble if available, else fallback
+        const scr = (scrambles.length >= count) ? scrambles[i-1] : generate3bldScrambleText();
         listContainer.innerHTML += `
             <div class="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl">
                 <div class="flex items-center gap-2 mb-2">
