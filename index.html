@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Cube Timer</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -11,37 +12,38 @@
             theme: {
                 extend: {
                     colors: {
-                        slate: {
-                            850: '#1e293b', 
-                            900: '#0f172a',
-                            950: '#020617',
-                        }
+                        slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' }
                     },
-                    screens: {
-                        'md': '768px' // iPad mini portrait width
-                    }
+                    screens: { 'md': '768px' }
                 }
             }
         }
     </script>
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Mobile Bottom Nav Safe Area */
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
         
-        /* Twisty Player Customization */
+        /* Twisty Player Style */
         twisty-player {
             width: 100%;
             height: 100%;
             max-width: 300px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in;
+            pointer-events: none; /* 드래그 방지 (타이머 터치 간섭 최소화) */
+        }
+        twisty-player.ready {
+            opacity: 1;
+            pointer-events: auto;
         }
     </style>
 </head>
 <body class="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 overflow-hidden transition-colors duration-200">
 
-    <!-- Header (PC & Mobile shared, layout adjusts) -->
+    <!-- Header -->
     <header class="w-full h-14 md:h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-6 flex items-center justify-between z-40 shrink-0 transition-colors duration-200">
         <div class="flex items-center gap-2">
             <div class="w-7 h-7 md:w-8 md:h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -63,8 +65,6 @@
         </div>
     </header>
 
-    <!-- Modals (Bluetooth, Session, Mbf, Stats, Settings, Share, UpdateLog, SolveDetail) -->
-    
     <!-- Bluetooth Modal -->
     <div id="btOverlay" class="modal-overlay" onclick="closeBTModal()">
         <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl p-8" onclick="event.stopPropagation()">
@@ -171,7 +171,6 @@
                     <div><p class="text-xs font-bold text-slate-600 dark:text-slate-300">Precision</p></div>
                     <div class="flex items-center gap-2"><span class="text-[9px] font-bold text-slate-400">.00</span><label class="switch"><input type="checkbox" id="precisionToggle"><span class="slider"></span></label><span class="text-[9px] font-bold text-slate-400">.000</span></div>
                 </div>
-                <!-- PC Backup Import moved here for mobile if needed, but keeping in header for now -->
                 <div class="md:hidden flex gap-2 pt-2">
                     <button onclick="exportData()" class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl">Backup</button>
                     <button onclick="triggerImport()" class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl">Restore</button>
@@ -231,7 +230,7 @@
             </div>
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-3">
-                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.2.0</span>
+                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.3.1</span>
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Latest</span>
                 </div>
                 <ul id="updateList" class="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 marker:text-blue-500 list-disc pl-4"></ul>
@@ -241,10 +240,8 @@
     </div>
 
     <!-- Main Content -->
-    <!-- Added id='mainContent' and pb-20 for mobile bottom nav space -->
     <main id="mainContent" class="main-container flex flex-col md:flex-row p-4 gap-6 flex-grow overflow-y-auto md:overflow-hidden pb-24 md:pb-4">
-        
-        <!-- Timer View Section (Shown by default on Mobile/Desktop) -->
+        <!-- ... (Main Content structure same as before) ... -->
         <div id="timerSection" class="flex-grow flex flex-col items-center justify-between h-full order-1 w-full">
             <div class="w-full space-y-6">
                 <!-- Category Select -->
@@ -264,7 +261,6 @@
                             <button onclick="changeEvent('777')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-777">7x7</button>
                             <button onclick="changeEvent('333oh')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-333oh">3x3 OH</button>
                         </div>
-                        <!-- ... other groups hidden by default ... -->
                         <div id="group-nonstandard" class="hidden flex gap-1">
                             <button onclick="changeEvent('clock')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-clock">Clock</button>
                             <button onclick="changeEvent('minx')" class="event-tab px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400" id="tab-minx">Megaminx</button>
@@ -281,11 +277,10 @@
                     </div>
                 </div>
 
-                <!-- Scramble -->
                 <div class="text-center w-full">
                     <h2 class="text-slate-300 dark:text-slate-600 uppercase tracking-[0.2em] text-[10px] font-bold mb-3">Scramble</h2>
                     <div id="scrambleBox" class="scramble-box p-6 md:p-8 min-h-[120px] flex flex-col items-center justify-center border border-slate-100 dark:border-slate-800 rounded-3xl transition-colors">
-                        <div id="scramble" class="text-base md:text-xl font-bold text-slate-600 dark:text-slate-300 whitespace-pre-wrap text-center max-w-5xl leading-relaxed">Generating...</div>
+                        <div id="scramble" class="text-base md:text-xl font-bold text-slate-600 dark:text-slate-300 whitespace-pre-wrap text-center max-w-5xl leading-relaxed">Loading...</div>
                         <div id="mbfInputArea" class="hidden flex flex-col items-center gap-4 w-full">
                             <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Enter number of cubes</p>
                             <div class="flex gap-2 w-full max-w-xs">
@@ -297,14 +292,12 @@
                 </div>
             </div>
 
-            <!-- Timer Area -->
             <div id="timerContainer" class="flex flex-col items-center justify-center flex-grow w-full select-none">
                 <div id="timerInteractiveArea" class="rounded-3xl transition-colors hover:bg-slate-100/30 dark:hover:bg-slate-800/30 w-full h-full flex flex-col justify-center items-center">
                     <div id="timerDisplayContainer" class="w-full flex justify-center">
                         <div id="timer" class="timer-display text-slate-800 dark:text-slate-100 transition-all duration-100">0.00</div>
                         <input type="text" id="manualInput" class="manual-input hidden text-blue-500 dark:text-blue-400" placeholder="0.00">
                     </div>
-                    
                     <div class="flex gap-6 mt-8">
                         <div class="avg-badge" onclick="openAvgShare('primary')">
                             <span id="labelPrimaryAvg" class="text-[11px] uppercase font-bold text-blue-400 mb-2 tracking-widest">Ao5</span>
@@ -316,18 +309,15 @@
                         </div>
                     </div>
                 </div>
-                
                 <div id="statusHint" class="bg-white dark:bg-slate-800 px-6 py-2 rounded-full text-slate-400 text-xs font-bold tracking-widest shadow-sm border border-slate-100 dark:border-slate-700 uppercase transition-all duration-200">Hold to Ready</div>
             </div>
 
-            <!-- Buttons: Penalty/Delete -->
             <div class="w-full max-w-xl flex justify-center gap-4 mt-2 mb-6">
                 <button id="plus2Btn" class="penalty-btn inactive" onclick="togglePenalty('+2')">+2</button>
                 <button id="dnfBtn" class="penalty-btn inactive" onclick="togglePenalty('DNF')">DNF</button>
             </div>
         </div>
 
-        <!-- History View Section (Hidden on Mobile by default, Visible on Desktop) -->
         <div id="historySection" class="hidden md:flex w-full md:w-[360px] history-panel flex-col order-2 overflow-hidden shrink-0 bg-white dark:bg-slate-900 border border-transparent dark:border-slate-800 h-full">
             <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0 rounded-t-3xl">
                 <div class="flex items-center gap-2">
@@ -340,9 +330,7 @@
                 </div>
                 <button id="clearHistoryBtn" class="text-[11px] font-bold text-slate-300 hover:text-red-400 transition-colors uppercase tracking-wider">Clear</button>
             </div>
-            
             <div id="historyList" class="flex-grow overflow-y-auto p-4 space-y-2 custom-scroll bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800"></div>
-            
             <div class="bg-slate-50 dark:bg-slate-950 shrink-0 rounded-b-3xl">
                 <div class="p-5 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-4">
                     <div class="flex flex-col">
@@ -357,7 +345,6 @@
                         <span id="bestSolve" class="text-sm font-bold text-blue-600 dark:text-blue-400">-</span>
                     </div>
                 </div>
-                
                 <div class="flex flex-col p-4 bg-slate-50/50 dark:bg-slate-900/50 relative">
                     <div class="flex items-center justify-between mb-3 px-2">
                         <span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400" id="toolLabel">Scramble Image</span>
@@ -372,9 +359,7 @@
                             </div>
                         </div>
                     </div>
-
                     <div id="toolContainer" class="flex items-center justify-center min-h-[190px]">
-                        <!-- [CHANGED] Canvas replaced with Twisty Player for full support -->
                         <div id="visualizerWrapper" class="w-full flex justify-center items-center h-[200px]">
                             <twisty-player id="mainPlayer" background="none" control-panel="none" visualization="2D"></twisty-player>
                             <div id="noVisualizerMsg" class="hidden text-[11px] text-slate-300 italic">Visualizer not available</div>
@@ -392,7 +377,7 @@
         </div>
     </main>
 
-    <!-- Mobile Bottom Navigation (Hidden on PC) -->
+    <!-- Mobile Bottom Navigation -->
     <nav class="md:hidden fixed bottom-0 w-full bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex justify-around items-center h-16 pb-safe z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button onclick="switchMobileTab('timer')" id="mob-tab-timer" class="flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -403,16 +388,18 @@
             <span class="text-[10px] font-bold mt-1">Stats</span>
         </button>
         <button onclick="openSettings()" class="flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span class="text-[10px] font-bold mt-1">Settings</span>
         </button>
     </nav>
 
-    <!-- Scrambo Library for WCA Official 3x3 Scrambles -->
+    <!-- External Libraries (Stable Versions) -->
+    <!-- Scrambo: Uses JSDelivr for reliable global variable exposure -->
     <script src="https://cdn.jsdelivr.net/gh/kotarot/scrambo/scrambo.min.js"></script>
-    <!-- Cubing.js Twisty Player for Visualization -->
+    <!-- Twisty Player: Official Cubing.js module -->
     <script src="https://cdn.cubing.net/js/cubing/twisty" type="module"></script>
-    <!-- 외부 스크립트 연결 -->
+    
+    <!-- App Script (Loaded after libraries) -->
     <script src="script.js"></script>
 </body>
 </html>
