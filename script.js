@@ -562,9 +562,17 @@ const CubeTimerApp = {
                 'toolsDropdown', 'toolLabel', 'graphLine', 'currentSessionNameDisplay', 'sessionList',
                 'sessionCreateForm', 'newSessionName', 'sessionCountLabel', 'statsContent', 'modalTime',
                 'modalEvent', 'modalScramble', 'shareDate', 'shareLabel', 'shareAvg', 'shareList',
-                'updateVersion', 'updateList', 'mbfScrambleList', 'mbfCubeCountDisplay', 'importInput'
+                'updateVersion', 'updateList', 'mbfScrambleList', 'mbfCubeCountDisplay', 'importInput',
+                // Explicitly added buttons
+                'genMbfBtn', 'copyMbfBtn', 'closeMbfBtn', 'copyShareBtn', 'closeShareBtn',
+                'shareSingleBtn', 'useScrambleBtn', 'closeDetailBtn', 'closeUpdateLogBtn', 'closeStatsBtn',
+                'addSessionBtn', 'closeSessionBtn', 'btCloseBtn', 'closeSettingsBtn'
             ];
-            ids.forEach(id => CubeTimerApp.dom[id] = document.getElementById(id));
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) CubeTimerApp.dom[id] = el;
+                // else console.warn(`Element with ID ${id} not found.`); // Optional debug
+            });
             CubeTimerApp.dom.visualizerCanvas = document.getElementById('cubeVisualizer'); // explicit mapping
 
             this.setupEventListeners();
