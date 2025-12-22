@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Fixed: 'visualizer.draw' crash, Settings modal, Initial render
+ * Fixed: Visualizer draw logic, Scramble image persistence
  */
 
 const CubeTimerApp = {
@@ -11,7 +11,7 @@ const CubeTimerApp = {
         isRunning: false,
         isReady: false,
         startTime: 0,
-        currentScramble: "",
+        currentScramble: "Generating...",
         precision: 2,
         isManualMode: false,
         isAo5Mode: true,
@@ -37,11 +37,11 @@ const CubeTimerApp = {
     },
 
     config: {
-        appVersion: '1.2',
+        appVersion: '1.2.1',
         updateLogs: [
-            "Etc. 종목(메가밍크스, 피라밍크스 등) 스크램블 이미지 지원",
-            "설정 팝업 버그 수정",
-            "초기화 안정성 개선"
+            "스크램블 이미지 미표시 버그 수정",
+            "시각화 도구 전환 로직 개선",
+            "Etc. 종목 지원 강화"
         ],
         events: {
             '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -63,8 +63,7 @@ const CubeTimerApp = {
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
-        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
     },
 
     dom: {},
@@ -165,26 +164,47 @@ const CubeTimerApp = {
 
     scrambler: {
         generate() {
-            const event = CubeTimerApp.state.currentEvent;
-            const conf = CubeTimerApp.config.events[event];
-            if (!conf || event === '333mbf') return;
+            try {
+                const event = CubeTimerApp.state.currentEvent;
+                const conf = CubeTimerApp.config.events[event];
+                if (!conf || event === '333mbf') return;
 
-            let res = [];
-            
-            if (event === 'minx') this.generateMinx(res);
-            else if (event === 'clock') this.generateClock(res);
-            else if (event === 'sq1') this.generateSq1(res);
-            else if (['pyra', 'skewb'].includes(event)) this.generatePyraSkewb(res, conf);
-            else this.generateNxN(res, conf, event);
+                let res = [];
+                
+                // Logic for scrambles
+                if (event === 'minx') this.generateMinx(res);
+                else if (event === 'clock') this.generateClock(res);
+                else if (event === 'sq1') this.generateSq1(res);
+                else if (['pyra', 'skewb'].includes(event)) this.generatePyraSkewb(res, conf);
+                else this.generateNxN(res, conf, event);
 
-            CubeTimerApp.state.currentScramble = res.join(event === 'minx' ? "\n" : " ");
-            const scrEl = document.getElementById('scramble');
-            if(scrEl) scrEl.innerText = CubeTimerApp.state.currentScramble;
-            
-            CubeTimerApp.visualizer.update(conf.puzzle, CubeTimerApp.state.currentScramble);
+                // Ensure scramble is not empty
+                if (res.length === 0) res.push("R U R' U'");
 
-            CubeTimerApp.ui.resetPenaltyButtons();
-            if (CubeTimerApp.state.activeTool === 'graph') CubeTimerApp.ui.renderGraph();
+                const scrambleStr = res.join(event === 'minx' ? "\n" : " ");
+                CubeTimerApp.state.currentScramble = scrambleStr;
+
+                // Update Text UI
+                const scrEl = document.getElementById('scramble');
+                if(scrEl) scrEl.innerText = scrambleStr;
+                
+                // [FIX] Update Visualizer ALWAYS (even if tool is graph)
+                // This ensures the player is ready when user switches tool
+                try {
+                    CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
+                } catch(err) {
+                    console.warn("Visualizer Error:", err);
+                }
+
+                CubeTimerApp.ui.resetPenaltyButtons();
+                if (CubeTimerApp.state.activeTool === 'graph') {
+                    CubeTimerApp.ui.renderGraph();
+                }
+            } catch (e) {
+                console.error("Scramble Generation Failed:", e);
+                const scrEl = document.getElementById('scramble');
+                if(scrEl) scrEl.innerText = "Error generating scramble";
+            }
         },
 
         generateMinx(res) {
@@ -478,29 +498,41 @@ const CubeTimerApp = {
             if(msg) msg.classList.add('hidden');
             container.style.display = 'flex';
 
-            // Clear previous
-            container.innerHTML = '';
-            
+            // Check blind event
             if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
                if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
                container.style.display = 'none';
                return;
             }
 
-            // Create Twisty Player
-            const player = document.createElement('twisty-player');
+            // [FIX] Reuse existing player to prevent flickering/re-creation overhead
+            let player = container.querySelector('twisty-player');
+            if (!player) {
+                player = document.createElement('twisty-player');
+                player.setAttribute('visualization', '2D');
+                player.setAttribute('background', 'none');
+                player.setAttribute('control-panel', 'none');
+                player.style.pointerEvents = "none"; // Disable interaction
+                container.appendChild(player);
+            }
+            
+            // Update attributes
             player.setAttribute('puzzle', puzzleId);
             player.setAttribute('alg', scramble);
-            player.setAttribute('visualization', '2D');
-            player.setAttribute('background', 'none');
-            player.setAttribute('control-panel', 'none');
-            player.style.pointerEvents = "none"; 
-            
-            container.appendChild(player);
         },
-        // [FIX] Added dummy draw function to prevent crashes
-        draw() { /* No-op: twisty-player handles this */ },
-        clear() { /* No-op: handled by update */ }
+        // [FIX] Implemented draw function to allow tool switching updates
+        draw() {
+            const event = CubeTimerApp.state.currentEvent;
+            const conf = CubeTimerApp.config.events[event];
+            const scramble = CubeTimerApp.state.currentScramble;
+            if (conf && scramble) {
+                this.update(conf.puzzle, scramble);
+            }
+        },
+        clear() { 
+            const container = document.getElementById('cubeVisualizer');
+            if(container) container.innerHTML = '';
+        }
     },
 
     ui: {
