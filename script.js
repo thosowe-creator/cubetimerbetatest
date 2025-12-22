@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Now with Full Twisty Puzzle Support via cubing.js
+ * Fixed: 'visualizer.draw' crash, Settings modal, Initial render
  */
 
 const CubeTimerApp = {
@@ -63,7 +63,8 @@ const CubeTimerApp = {
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
+        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
     },
 
     dom: {},
@@ -170,7 +171,6 @@ const CubeTimerApp = {
 
             let res = [];
             
-            // Logic for scrambles
             if (event === 'minx') this.generateMinx(res);
             else if (event === 'clock') this.generateClock(res);
             else if (event === 'sq1') this.generateSq1(res);
@@ -181,7 +181,6 @@ const CubeTimerApp = {
             const scrEl = document.getElementById('scramble');
             if(scrEl) scrEl.innerText = CubeTimerApp.state.currentScramble;
             
-            // --- NEW Visualizer Logic using Twisty Player ---
             CubeTimerApp.visualizer.update(conf.puzzle, CubeTimerApp.state.currentScramble);
 
             CubeTimerApp.ui.resetPenaltyButtons();
@@ -489,18 +488,19 @@ const CubeTimerApp = {
             }
 
             // Create Twisty Player
-            // Note: We use string construction to avoid import issues, browser handles custom element
             const player = document.createElement('twisty-player');
             player.setAttribute('puzzle', puzzleId);
             player.setAttribute('alg', scramble);
             player.setAttribute('visualization', '2D');
             player.setAttribute('background', 'none');
             player.setAttribute('control-panel', 'none');
-            // Prevent interactivity to keep it as an image
             player.style.pointerEvents = "none"; 
             
             container.appendChild(player);
-        }
+        },
+        // [FIX] Added dummy draw function to prevent crashes
+        draw() { /* No-op: twisty-player handles this */ },
+        clear() { /* No-op: handled by update */ }
     },
 
     ui: {
@@ -906,14 +906,13 @@ const CubeTimerApp = {
             const scrEl = document.getElementById('scramble');
             const mbfEl = document.getElementById('mbfInputArea');
 
-            // Force visibility toggle directly to ensure init
             if(event === '333mbf') {
                 if(scrEl) scrEl.classList.add('hidden');
                 if(mbfEl) mbfEl.classList.remove('hidden');
             } else {
                 if(scrEl) {
                     scrEl.classList.remove('hidden');
-                    CubeTimerApp.scrambler.generate(); // Force generation
+                    CubeTimerApp.scrambler.generate();
                 }
                 if(mbfEl) mbfEl.classList.add('hidden');
             }
