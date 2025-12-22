@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Fixed: Visualizer logic (Reuse existing player instead of recreating)
+ * Fixed: Visualizer module updated to use 'cubing.js' TwistyPlayer
  */
 
 const CubeTimerApp = {
@@ -39,11 +39,11 @@ const CubeTimerApp = {
 
     // --- Configuration ---
     config: {
-        appVersion: '1.2.2',
+        appVersion: '1.2.3',
         updateLogs: [
-            "스크램블 이미지 렌더링 방식 최적화 (깜빡임 해결)",
-            "Etc. 종목 시각화 지원",
-            "설정 팝업 및 초기화 버그 수정"
+            "스크램블 이미지 시각화 엔진 교체 (Cubing.js)",
+            "모든 WCA 종목 (메가밍크스, 피라밍크스 등) 이미지 지원",
+            "초기화 및 설정 팝업 안정화"
         ],
         events: {
             '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -65,12 +65,14 @@ const CubeTimerApp = {
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
-        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
     },
 
+    // --- DOM Cache ---
     dom: {},
 
+    // --- Core Modules ---
+    
     timer: {
         interval: null,
         holdTimer: null,
@@ -174,42 +176,32 @@ const CubeTimerApp = {
 
                 let res = [];
                 
-                // Logic for scrambles
                 if (event === 'minx') this.generateMinx(res);
                 else if (event === 'clock') this.generateClock(res);
                 else if (event === 'sq1') this.generateSq1(res);
                 else if (['pyra', 'skewb'].includes(event)) this.generatePyraSkewb(res, conf);
                 else this.generateNxN(res, conf, event);
 
-                // Ensure scramble is not empty
                 if (res.length === 0) res.push("R U R' U'");
 
                 const scrambleStr = res.join(event === 'minx' ? "\n" : " ");
                 CubeTimerApp.state.currentScramble = scrambleStr;
 
-                // Update Text UI FIRST
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = scrambleStr;
                 
-                // [FIX] Update Visualizer safely
+                // [FIX] Correctly call visualizer.update
+                CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
+
                 CubeTimerApp.ui.resetPenaltyButtons();
-                if (CubeTimerApp.state.activeTool === 'graph') {
-                    CubeTimerApp.ui.renderGraph();
-                } 
-                
-                // Update visualizer even if hidden, so it's ready when switched
-                try {
-                    CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
-                } catch(err) {
-                    console.warn("Visualizer Error:", err);
-                }
+                if (CubeTimerApp.state.activeTool === 'graph') CubeTimerApp.ui.renderGraph();
+
             } catch (e) {
                 console.error("Scramble Generation Failed:", e);
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = "Error generating scramble";
             }
         },
-
         generateMinx(res) {
             for (let i = 0; i < 7; i++) {
                 let line = [];
@@ -310,6 +302,58 @@ const CubeTimerApp = {
                 res.push(wideMoves[Math.floor(Math.random() * wideMoves.length)] + suffixes[Math.floor(Math.random() * 3)]);
             }
             return res.join(" ");
+        }
+    },
+
+    // [FIX] NEW Visualizer Module using Twisty Player
+    visualizer: {
+        update(puzzleId, scramble) {
+            const container = document.getElementById('cubeVisualizer');
+            if(!container) return;
+            
+            const msg = document.getElementById('noVisualizerMsg');
+            if(msg) msg.classList.add('hidden');
+            container.style.display = 'flex';
+
+            if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
+               if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
+               container.style.display = 'none';
+               // Hide any existing player
+               const p = container.querySelector('twisty-player');
+               if(p) p.style.display = 'none';
+               return;
+            }
+
+            // Reuse player logic
+            let player = container.querySelector('twisty-player');
+            if (!player) {
+                player = document.createElement('twisty-player');
+                player.setAttribute('visualization', '2D');
+                player.setAttribute('background', 'none');
+                player.setAttribute('control-panel', 'none');
+                player.style.pointerEvents = "none"; 
+                container.appendChild(player);
+            }
+            
+            player.style.display = 'block';
+            player.setAttribute('puzzle', puzzleId);
+            player.setAttribute('alg', scramble);
+        },
+        draw() {
+            // Re-trigger update if tool is switched
+            const event = CubeTimerApp.state.currentEvent;
+            const conf = CubeTimerApp.config.events[event];
+            const scramble = CubeTimerApp.state.currentScramble;
+            if (conf && scramble) {
+                this.update(conf.puzzle, scramble);
+            }
+        },
+        clear() { 
+            const container = document.getElementById('cubeVisualizer');
+            if(container) {
+                const p = container.querySelector('twisty-player');
+                if(p) p.style.display = 'none';
+            }
         }
     },
 
@@ -489,56 +533,6 @@ const CubeTimerApp = {
             CubeTimerApp.state.isBtConnected = false;
             CubeTimerApp.state.lastBtState = null;
             CubeTimerApp.ui.updateBTUI(false);
-        }
-    },
-
-    visualizer: {
-        update(puzzleId, scramble) {
-            const container = document.getElementById('cubeVisualizer');
-            if(!container) return;
-            
-            const msg = document.getElementById('noVisualizerMsg');
-            if(msg) msg.classList.add('hidden');
-            container.style.display = 'flex';
-
-            // Check blind event
-            if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
-               if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
-               container.style.display = 'none';
-               // Clear player if exists to stop rendering
-               container.innerHTML = '';
-               return;
-            }
-
-            // [FIXED] Reuse existing player to prevent flickering and overhead
-            // Do NOT use innerHTML = '' here
-            let player = container.querySelector('twisty-player');
-            if (!player) {
-                // Only create if it doesn't exist
-                player = document.createElement('twisty-player');
-                player.setAttribute('visualization', '2D');
-                player.setAttribute('background', 'none');
-                player.setAttribute('control-panel', 'none');
-                player.style.pointerEvents = "none"; 
-                container.appendChild(player);
-            }
-            
-            // Update attributes on existing or new player
-            player.setAttribute('puzzle', puzzleId);
-            player.setAttribute('alg', scramble);
-        },
-        // [FIX] Implemented draw function to allow tool switching updates
-        draw() {
-            const event = CubeTimerApp.state.currentEvent;
-            const conf = CubeTimerApp.config.events[event];
-            const scramble = CubeTimerApp.state.currentScramble;
-            if (conf && scramble) {
-                this.update(conf.puzzle, scramble);
-            }
-        },
-        clear() { 
-            const container = document.getElementById('cubeVisualizer');
-            if(container) container.innerHTML = '';
         }
     },
 
