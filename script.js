@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Fixed: Settings modal animation, Initial render issues
+ * Fixed: Settings modal not appearing & Timer color issue
  */
 
 const CubeTimerApp = {
@@ -82,6 +82,10 @@ const CubeTimerApp = {
         start() {
             if(this.inspectionInterval) clearInterval(this.inspectionInterval); 
             CubeTimerApp.state.inspectionState = 'none';
+            
+            // [FIX] Start 시 색상 초기화 (초록색 제거)
+            if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.style.color = '';
+
             CubeTimerApp.state.startTime = Date.now(); 
             CubeTimerApp.state.isRunning = true;
             this.interval = setInterval(() => {
@@ -94,6 +98,9 @@ const CubeTimerApp = {
             clearInterval(this.interval);
             let elapsed = forcedTime !== null ? forcedTime : (Date.now() - CubeTimerApp.state.startTime);
             CubeTimerApp.state.lastStopTimestamp = Date.now(); 
+            
+            // [FIX] Stop 시 색상 초기화 (확실하게 검은색/흰색으로 복구)
+            if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.style.color = '';
             
             let finalPenalty = CubeTimerApp.state.inspectionPenalty; 
 
@@ -153,8 +160,8 @@ const CubeTimerApp = {
         stopInspection() {
             if(this.inspectionInterval) clearInterval(this.inspectionInterval);
             CubeTimerApp.state.inspectionState = 'none';
-            const tEl = document.getElementById('timer');
-            if(tEl) tEl.style.color = '';
+            // [FIX] 인스펙션 중단 시 색상 초기화
+            if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.style.color = '';
             
             if (CubeTimerApp.state.isInspectionMode && CubeTimerApp.state.inspectionStartTime > 0) {
                 const elapsed = (Date.now() - CubeTimerApp.state.inspectionStartTime) / 1000;
@@ -551,6 +558,30 @@ const CubeTimerApp = {
 
     ui: {
         init() {
+            // Map IDs to DOM Object
+            const ids = [
+                'timer', 'scramble', 'mbfInputArea', 'mbfCubeInput', 'manualInput', 'historyList',
+                'solveCount', 'sessionAvg', 'bestSolve', 'labelPrimaryAvg', 'displayPrimaryAvg', 'displayAo12',
+                'statusHint', 'plus2Btn', 'dnfBtn', 'cubeVisualizer', 'noVisualizerMsg',
+                'avgModeToggle', 'precisionToggle', 'manualEntryToggle', 'darkModeToggle', 'wakeLockToggle',
+                'holdDurationSlider', 'holdDurationValue', 'inspectionToggle', 'timerSection', 'historySection',
+                'mob-tab-timer', 'mob-tab-history', 'btStatusText', 'btModalIcon', 'btInfoPanel', 'btDeviceName',
+                'btDisconnectBtn', 'btConnectBtn', 'timerInteractiveArea', 'visualizerWrapper', 'graphWrapper',
+                'toolsDropdown', 'toolLabel', 'graphLine', 'currentSessionNameDisplay', 'sessionList',
+                'sessionCreateForm', 'newSessionName', 'sessionCountLabel', 'statsContent', 'modalTime',
+                'modalEvent', 'modalScramble', 'shareDate', 'shareLabel', 'shareAvg', 'shareList',
+                'updateVersion', 'updateList', 'mbfScrambleList', 'mbfCubeCountDisplay', 'importInput',
+                'genMbfBtn', 'copyMbfBtn', 'closeMbfBtn', 'copyShareBtn', 'closeShareBtn',
+                'shareSingleBtn', 'useScrambleBtn', 'closeDetailBtn', 'closeUpdateLogBtn', 'closeStatsBtn',
+                'addSessionBtn', 'closeSessionBtn', 'btCloseBtn', 'closeSettingsBtn',
+                'mobBackupBtn', 'mobRestoreBtn', 'settingsOverlay'
+            ];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) CubeTimerApp.dom[id] = el;
+            });
+            CubeTimerApp.dom.visualizerCanvas = document.getElementById('cubeVisualizer');
+
             this.setupEventListeners();
             this.handleResize();
         },
@@ -1144,14 +1175,16 @@ const CubeTimerApp = {
                 window.speechSynthesis.speak(utterance);
             }
         },
-        // [FIX] Open Modal handles specific Settings animation
+        // [FIX] Open Modal handles specific Settings animation with delay
         openModal(id) { 
             const el = document.getElementById(id); 
             if(el) { 
                 el.classList.add('active'); 
                 if(id === 'settingsOverlay') {
                     const content = document.getElementById('settingsModal');
-                    if(content) setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 10);
+                    // Force reflow
+                    void content.offsetWidth;
+                    if(content) setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 50);
                 }
                 if(id === 'sessionOverlay') CubeTimerApp.ui.renderSessionList(); 
             }
@@ -1161,28 +1194,16 @@ const CubeTimerApp = {
             const el = document.getElementById(id);
             if(el) {
                 if(id === 'settingsOverlay') {
-                    // Just removing active instantly for now to keep consistent with other modals, 
-                    // or implement reverse transition if strict fidelity needed. 
-                    // Given previous bugs, simple removal is safer.
-                    el.classList.remove('active');
                     const content = document.getElementById('settingsModal');
-                    // Reset animation classes so next open works
                     if(content) content.classList.add('scale-95', 'opacity-0');
+                    setTimeout(() => el.classList.remove('active'), 200);
                 } else {
                     el.classList.remove('active');
                 }
             }
         },
         openSettingsModal() { this.openModal('settingsOverlay'); },
-        closeSettingsModal() { 
-            const content = document.getElementById('settingsModal');
-            if(content) content.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                const overlay = document.getElementById('settingsOverlay');
-                if(overlay) overlay.classList.remove('active');
-            }, 200);
-            CubeTimerApp.storage.save();
-        },
+        closeSettingsModal() { this.closeModal('settingsOverlay'); CubeTimerApp.storage.save(); },
         checkUpdateLog() {
             const saved = localStorage.getItem('appVersion');
             if (saved !== CubeTimerApp.config.appVersion) {
@@ -1392,13 +1413,13 @@ const CubeTimerApp = {
     }
 };
 
-// Initialize App
+// Initialize App with a slight delay to ensure DOM is fully ready
 document.addEventListener('DOMContentLoaded', () => {
     CubeTimerApp.ui.init();
     CubeTimerApp.storage.load();
-    // DOM 렌더링이 확실히 끝난 후 실행되도록 지연
+    // Force a re-render after a short delay to fix blank state issues
     setTimeout(() => {
         CubeTimerApp.ui.changeEvent(CubeTimerApp.state.currentEvent || '333');
         CubeTimerApp.utils.checkUpdateLog();
-    }, 0);
+    }, 50);
 });
