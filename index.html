@@ -21,11 +21,10 @@
         }
     </script>
     
-    <!-- Cubing.js Library (Web Component Registration) -->
-    <!-- [수정됨] window.TwistyPlayer에 할당하여 script.js에서 접근 가능하도록 변경 -->
+    <!-- Cubing.js Library -->
+    <!-- window.TwistyPlayer 할당 없이 Custom Element 정의만 수행 -->
     <script type="module">
         import { TwistyPlayer } from "https://cdn.cubing.net/v0/js/cubing/twisty";
-        window.TwistyPlayer = TwistyPlayer; 
         if (!customElements.get('twisty-player')) {
             customElements.define('twisty-player', TwistyPlayer);
         }
@@ -224,8 +223,8 @@
             </div>
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-3">
-                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.3.0</span>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recovery</span>
+                    <span id="updateVersion" class="text-xs font-black bg-blue-600 text-white px-2 py-1 rounded-md uppercase">v1.4.7</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hotfix</span>
                 </div>
                 <ul id="updateList" class="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 marker:text-blue-500 list-disc pl-4"></ul>
             </div>
@@ -366,7 +365,6 @@
 
                     <div id="toolContainer" class="flex items-center justify-center min-h-[190px]">
                         <div id="visualizerWrapper" class="w-full h-full flex justify-center items-center">
-                            <!-- [핵심] 3. Canvas 대신 div로 변경하여 Web Component 삽입 준비 완료 -->
                             <div id="cubeVisualizer" class="w-full h-full flex justify-center items-center"></div>
                             <div id="noVisualizerMsg" class="hidden text-[11px] text-slate-300 italic">Visualizer for standard cubes only</div>
                         </div>
@@ -394,7 +392,7 @@
             <span class="text-[10px] font-bold mt-1">Stats</span>
         </button>
         <button id="mobSettingsBtn" class="flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span class="text-[10px] font-bold mt-1">Settings</span>
         </button>
     </nav>
