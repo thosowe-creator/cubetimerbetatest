@@ -1,9 +1,10 @@
 /**
  * Cube Timer Application
- * Fixed: Settings modal logic conflict, Hold duration reset bug
+ * Fixed: Robust Visualization & Simple Settings Modal
  */
 
 const CubeTimerApp = {
+    // --- State Management ---
     state: {
         solves: [],
         sessions: {},
@@ -18,7 +19,6 @@ const CubeTimerApp = {
         editingSessionId: null,
         activeTool: 'scramble',
         holdDuration: 300,
-        savedHoldDuration: 300, // [NEW] To restore hold time after inspection
         wakeLock: null,
         isWakeLockEnabled: false,
         selectedSolveId: null,
@@ -37,12 +37,13 @@ const CubeTimerApp = {
         isBtConnected: false
     },
 
+    // --- Configuration ---
     config: {
-        appVersion: '1.2.4',
+        appVersion: '1.2.5',
         updateLogs: [
-            "인스펙션 해제 시 홀드 시간 복구 로직 수정",
-            "설정 팝업 이벤트 중복 제거",
-            "스크램블 이미지 엔진 최적화"
+            "스크램블 이미지 로드 방식 개선 (대기열 처리)",
+            "설정 팝업 표시 오류 수정 (강제 표시)",
+            "초기화 안정성 강화"
         ],
         events: {
             '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -64,8 +65,7 @@ const CubeTimerApp = {
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
-        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
     },
 
     dom: {},
@@ -192,11 +192,9 @@ const CubeTimerApp = {
                     CubeTimerApp.ui.renderGraph();
                 } 
                 
-                try {
-                    CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
-                } catch(err) {
-                    console.warn("Visualizer update pending:", err);
-                }
+                // Always try to update visualizer
+                CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
+
             } catch (e) {
                 console.error("Scramble Generation Failed:", e);
                 const scrEl = document.getElementById('scramble');
@@ -319,24 +317,30 @@ const CubeTimerApp = {
             if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
                if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
                container.style.display = 'none';
+               // Hide any existing player
                const p = container.querySelector('twisty-player');
                if(p) p.style.display = 'none';
                return;
             }
 
-            let player = container.querySelector('twisty-player');
-            if (!player) {
-                player = document.createElement('twisty-player');
-                player.setAttribute('visualization', '2D');
-                player.setAttribute('background', 'none');
-                player.setAttribute('control-panel', 'none');
-                player.style.pointerEvents = "none"; 
-                container.appendChild(player);
+            // [CRITICAL FIX] Wait for library to be ready using standard API
+            if (customElements.get('twisty-player')) {
+                let player = container.querySelector('twisty-player');
+                if (!player) {
+                    player = document.createElement('twisty-player');
+                    player.setAttribute('visualization', '2D');
+                    player.setAttribute('background', 'none');
+                    player.setAttribute('control-panel', 'none');
+                    player.style.pointerEvents = "none"; 
+                    container.appendChild(player);
+                }
+                player.style.display = 'block';
+                player.setAttribute('puzzle', puzzleId);
+                player.setAttribute('alg', scramble);
+            } else {
+                // If not ready, try again in 300ms
+                setTimeout(() => this.update(puzzleId, scramble), 300);
             }
-            
-            player.style.display = 'block';
-            player.setAttribute('puzzle', puzzleId);
-            player.setAttribute('alg', scramble);
         },
         draw() {
             const event = CubeTimerApp.state.currentEvent;
@@ -404,12 +408,11 @@ const CubeTimerApp = {
             this.bindModal('mbfScrambleOverlay', 'closeMbfBtn');
             this.bindModal('statsOverlay', 'closeStatsBtn');
             
-            // [FIX] Settings Modal Logic - Cleaned up to prevent double binding
-            const sOv = document.getElementById('settingsOverlay');
-            // Only bind click-outside if not handled by bindModal in a conflicting way (it is safe here as bindModal is generic)
-            if(sOv) sOv.addEventListener('click', (e) => { if(e.target === sOv) U.closeSettingsModal(); });
-            const sCl = document.getElementById('closeSettingsBtn');
-            if(sCl) sCl.addEventListener('click', () => U.closeSettingsModal());
+            // [FIX] Simple Settings Modal Logic (Force show)
+            safeAdd('settingsOverlay', 'click', (e) => { 
+                if(e.target.id === 'settingsOverlay') U.closeSettingsModal(); 
+            });
+            safeAdd('closeSettingsBtn', 'click', () => U.closeSettingsModal());
 
             this.bindModal('avgShareOverlay', 'closeShareBtn');
             this.bindModal('modalOverlay', 'closeDetailBtn');
@@ -421,7 +424,6 @@ const CubeTimerApp = {
             const imp = document.getElementById('importInput');
             if(imp) imp.addEventListener('change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
             
-            // Explicit Settings Open Handlers
             safeAdd('settingsBtn', 'click', () => U.openSettingsModal());
             safeAdd('mobSettingsBtn', 'click', () => U.openSettingsModal());
 
@@ -509,8 +511,7 @@ const CubeTimerApp = {
             const overlay = document.getElementById(overlayId);
             const closeBtn = document.getElementById(closeBtnId);
             if(closeBtn) closeBtn.addEventListener('click', () => CubeTimerApp.utils.closeModal(overlayId));
-            // Settings overlay handled separately to avoid conflict with animation logic
-            if(overlay && overlayId !== 'settingsOverlay') overlay.addEventListener('click', (e) => { if(e.target === overlay) CubeTimerApp.utils.closeModal(overlayId); });
+            if(overlay) overlay.addEventListener('click', (e) => { if(e.target === overlay) CubeTimerApp.utils.closeModal(overlayId); });
         },
 
         handleStart(e) {
@@ -979,12 +980,7 @@ const CubeTimerApp = {
             const el = document.getElementById(id); 
             if(el) { 
                 el.classList.add('active'); 
-                if(id === 'settingsOverlay') {
-                    const content = document.getElementById('settingsModal');
-                    // Force reflow
-                    void content.offsetWidth;
-                    if(content) setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 50);
-                }
+                // Removed complex animation logic for settings to ensure it shows
                 if(id === 'sessionOverlay') CubeTimerApp.ui.renderSessionList(); 
             }
         },
@@ -992,17 +988,33 @@ const CubeTimerApp = {
         closeModal(id) { 
             const el = document.getElementById(id);
             if(el) {
-                if(id === 'settingsOverlay') {
-                    const content = document.getElementById('settingsModal');
-                    if(content) content.classList.add('scale-95', 'opacity-0');
+                el.classList.remove('active');
+            }
+        },
+        openSettingsModal() { 
+            const el = document.getElementById('settingsOverlay');
+            if(el) {
+                el.classList.add('active');
+                // Force visible style directly if classes fail
+                const content = document.getElementById('settingsModal');
+                if(content) {
+                    content.classList.remove('scale-95', 'opacity-0');
+                }
+            }
+        },
+        closeSettingsModal() { 
+            const el = document.getElementById('settingsOverlay');
+            if(el) {
+                const content = document.getElementById('settingsModal');
+                if(content) {
+                    content.classList.add('scale-95', 'opacity-0');
                     setTimeout(() => el.classList.remove('active'), 200);
                 } else {
                     el.classList.remove('active');
                 }
             }
+            CubeTimerApp.storage.save(); 
         },
-        openSettingsModal() { this.openModal('settingsOverlay'); },
-        closeSettingsModal() { this.closeModal('settingsOverlay'); CubeTimerApp.storage.save(); },
         checkUpdateLog() {
             const saved = localStorage.getItem('appVersion');
             if (saved !== CubeTimerApp.config.appVersion) {
@@ -1027,23 +1039,16 @@ const CubeTimerApp = {
             CubeTimerApp.storage.save();
         },
         toggleInspection(el) {
-            const S = CubeTimerApp.state;
-            S.isInspectionMode = el && el.checked;
+            CubeTimerApp.state.isInspectionMode = el && el.checked;
             const slider = document.getElementById('holdDurationSlider');
             const container = document.getElementById('holdDurationContainer');
-            
             if (el && el.checked) { 
-                // [FIX] Save current hold duration before overwriting
-                if(S.holdDuration > 100) S.savedHoldDuration = S.holdDuration;
-                
                 this.updateHoldDuration(0.01); 
                 if(slider) { slider.value = 0.01; slider.disabled = true; }
                 if(container) container.classList.add('opacity-50', 'pointer-events-none'); 
             } else { 
-                // [FIX] Restore saved hold duration
-                const restored = S.savedHoldDuration ? S.savedHoldDuration / 1000 : 0.3;
-                this.updateHoldDuration(restored); 
-                if(slider) { slider.value = restored; slider.disabled = false; }
+                this.updateHoldDuration(0.3); 
+                if(slider) { slider.value = 0.3; slider.disabled = false; }
                 if(container) container.classList.remove('opacity-50', 'pointer-events-none'); 
             }
             CubeTimerApp.storage.save();
