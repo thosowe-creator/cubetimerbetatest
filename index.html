@@ -11,26 +11,35 @@
             theme: {
                 extend: {
                     colors: {
-                        slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' }
+                        slate: {
+                            850: '#1e293b', 
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
                     },
-                    screens: { 'md': '768px' }
+                    screens: {
+                        'md': '768px' // iPad mini portrait width
+                    }
                 }
             }
         }
     </script>
-    <!-- [NEW] Cubing.js for full puzzle visualization support -->
+    
+    <!-- [핵심] 1. 큐브 시각화 라이브러리 추가 -->
     <script src="https://cdn.cubing.net/js/cubing/twisty" type="module"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
+        /* Mobile Bottom Nav Safe Area */
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
-        /* Twisty Player Style Override */
+        
+        /* [핵심] 2. Twisty Player 스타일 추가 (이게 없으면 크기가 0이 될 수 있음) */
         twisty-player {
             width: 100%;
             height: 100%;
-            max-width: 300px;
+            max-width: 300px; /* 너무 커지지 않게 제한 */
             background: transparent;
         }
     </style>
@@ -367,7 +376,7 @@
 
                     <div id="toolContainer" class="flex items-center justify-center min-h-[190px]">
                         <div id="visualizerWrapper" class="w-full h-full flex justify-center items-center">
-                            <!-- [CHANGED] Replaced canvas with a container for twisty-player -->
+                            <!-- [핵심] 3. Canvas 대신 div로 변경하여 Web Component 삽입 준비 완료 -->
                             <div id="cubeVisualizer" class="w-full h-full flex justify-center items-center"></div>
                             <div id="noVisualizerMsg" class="hidden text-[11px] text-slate-300 italic">Visualizer for standard cubes only</div>
                         </div>
