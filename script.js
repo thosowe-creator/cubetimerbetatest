@@ -191,16 +191,17 @@ const CubeTimerApp = {
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = scrambleStr;
                 
-                // Update Visualizer
+                // [FIX] Update Visualizer safely
+                CubeTimerApp.ui.resetPenaltyButtons();
+                if (CubeTimerApp.state.activeTool === 'graph') {
+                    CubeTimerApp.ui.renderGraph();
+                } 
+                
+                // Update visualizer even if hidden, so it's ready when switched
                 try {
                     CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
                 } catch(err) {
                     console.warn("Visualizer Error:", err);
-                }
-
-                CubeTimerApp.ui.resetPenaltyButtons();
-                if (CubeTimerApp.state.activeTool === 'graph') {
-                    CubeTimerApp.ui.renderGraph();
                 }
             } catch (e) {
                 console.error("Scramble Generation Failed:", e);
@@ -526,6 +527,7 @@ const CubeTimerApp = {
             player.setAttribute('puzzle', puzzleId);
             player.setAttribute('alg', scramble);
         },
+        // [FIX] Implemented draw function to allow tool switching updates
         draw() {
             const event = CubeTimerApp.state.currentEvent;
             const conf = CubeTimerApp.config.events[event];
