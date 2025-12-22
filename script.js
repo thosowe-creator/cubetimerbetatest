@@ -21,6 +21,7 @@ const CubeTimerApp = {
         wakeLock: null,
         isWakeLockEnabled: false,
         selectedSolveId: null,
+        
         isInspectionMode: false,
         inspectionState: 'none',
         inspectionStartTime: 0,
@@ -28,6 +29,7 @@ const CubeTimerApp = {
         hasSpoken8: false,
         hasSpoken12: false,
         lastStopTimestamp: 0,
+
         displayedSolvesCount: 50,
         solvesBatchSize: 50,
         lastBtState: null,
@@ -146,7 +148,8 @@ const CubeTimerApp = {
         stopInspection() {
             if(this.inspectionInterval) clearInterval(this.inspectionInterval);
             CubeTimerApp.state.inspectionState = 'none';
-            if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.style.color = '';
+            const timerEl = document.getElementById('timer');
+            if(timerEl) timerEl.style.color = '';
             
             if (CubeTimerApp.state.isInspectionMode && CubeTimerApp.state.inspectionStartTime > 0) {
                 const elapsed = (Date.now() - CubeTimerApp.state.inspectionStartTime) / 1000;
@@ -172,7 +175,8 @@ const CubeTimerApp = {
             else this.generateNxN(res, conf, event);
 
             CubeTimerApp.state.currentScramble = res.join(event === 'minx' ? "\n" : " ");
-            if(CubeTimerApp.dom.scramble) CubeTimerApp.dom.scramble.innerText = CubeTimerApp.state.currentScramble;
+            const scrambleEl = document.getElementById('scramble');
+            if(scrambleEl) scrambleEl.innerText = CubeTimerApp.state.currentScramble;
             
             if (conf.n) { 
                 CubeTimerApp.visualizer.init(conf.n);
@@ -376,16 +380,20 @@ const CubeTimerApp = {
         characteristic: null,
         
         async connect() {
-            const els = CubeTimerApp.dom;
+            const statusText = document.getElementById('btStatusText');
             if (!navigator.bluetooth) {
-                if(els.btStatusText) els.btStatusText.innerText = "Web Bluetooth is not supported.";
-                if(els.btStatusText) els.btStatusText.classList.add('text-red-400');
+                if(statusText) {
+                    statusText.innerText = "Web Bluetooth is not supported.";
+                    statusText.classList.add('text-red-400');
+                }
                 return;
             }
             try {
-                if(els.btConnectBtn) { els.btConnectBtn.disabled = true; els.btConnectBtn.innerText = "Searching..."; }
-                if(els.btStatusText) els.btStatusText.innerText = "Select your GAN Timer in the popup";
-                if(els.btModalIcon) els.btModalIcon.classList.add('bt-pulse');
+                const btn = document.getElementById('btConnectBtn');
+                if(btn) { btn.disabled = true; btn.innerText = "Searching..."; }
+                if(statusText) statusText.innerText = "Select your GAN Timer in the popup";
+                const icon = document.getElementById('btModalIcon');
+                if(icon) icon.classList.add('bt-pulse');
 
                 this.device = await navigator.bluetooth.requestDevice({
                     filters: [{ namePrefix: 'GAN' }],
@@ -405,9 +413,11 @@ const CubeTimerApp = {
 
             } catch (error) {
                 console.error("BT Error:", error);
-                if(els.btStatusText) els.btStatusText.innerText = "Connection failed";
-                if(els.btConnectBtn) { els.btConnectBtn.disabled = false; els.btConnectBtn.innerText = "Connect Timer"; }
-                if(els.btModalIcon) els.btModalIcon.classList.remove('bt-pulse');
+                if(statusText) statusText.innerText = "Connection failed";
+                const btn = document.getElementById('btConnectBtn');
+                if(btn) { btn.disabled = false; btn.innerText = "Connect Timer"; }
+                const icon = document.getElementById('btModalIcon');
+                if(icon) icon.classList.remove('bt-pulse');
             }
         },
         handleData(event) {
@@ -418,7 +428,8 @@ const CubeTimerApp = {
 
             if (stateCode !== 3 && !S.isRunning && data.byteLength >= 8) {
                 const min = data.getUint8(4), sec = data.getUint8(5), msec = data.getUint16(6, true);
-                if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.innerText = CubeTimerApp.utils.formatTime((min*60000)+(sec*1000)+msec);
+                const timerEl = document.getElementById('timer');
+                if(timerEl) timerEl.innerText = CubeTimerApp.utils.formatTime((min*60000)+(sec*1000)+msec);
             }
 
             if (stateCode !== S.lastBtState) {
@@ -442,7 +453,8 @@ const CubeTimerApp = {
                         if (data.byteLength >= 8) {
                             const min = data.getUint8(4), sec = data.getUint8(5), msec = data.getUint16(6, true);
                             const finalMs = (min*60000)+(sec*1000)+msec;
-                            if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.innerText = CubeTimerApp.utils.formatTime(finalMs);
+                            const timerEl = document.getElementById('timer');
+                            if(timerEl) timerEl.innerText = CubeTimerApp.utils.formatTime(finalMs);
                             T.stop(finalMs);
                         }
                     }
@@ -467,17 +479,20 @@ const CubeTimerApp = {
             this.cubeState = { n };
             const C = CubeTimerApp.config.cubeColors;
             ['U','D','L','R','F','B'].forEach(f => this.cubeState[f] = Array(n*n).fill(C[f]));
-            if(CubeTimerApp.dom.visualizerCanvas) this.ctx = CubeTimerApp.dom.visualizerCanvas.getContext('2d');
+            const canvas = document.getElementById('cubeVisualizer');
+            if(canvas) this.ctx = canvas.getContext('2d');
         },
         clear() {
-            if(!CubeTimerApp.dom.visualizerCanvas) return;
-            CubeTimerApp.dom.visualizerCanvas.style.display = 'none';
-            if(CubeTimerApp.dom.noVisualizerMsg) {
-                CubeTimerApp.dom.noVisualizerMsg.classList.remove('hidden');
+            const canvas = document.getElementById('cubeVisualizer');
+            const msg = document.getElementById('noVisualizerMsg');
+            if(!canvas) return;
+            canvas.style.display = 'none';
+            if(msg) {
+                msg.classList.remove('hidden');
                 if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
-                    CubeTimerApp.dom.noVisualizerMsg.innerText = "Scramble images disabled for Blind";
+                    msg.innerText = "Scramble images disabled for Blind";
                 } else {
-                    CubeTimerApp.dom.noVisualizerMsg.innerText = "Visualizer for standard cubes only";
+                    msg.innerText = "Visualizer for standard cubes only";
                 }
             }
         },
@@ -508,8 +523,10 @@ const CubeTimerApp = {
         draw() {
             if(!this.ctx) return;
             const n = this.cubeState.n;
-            CubeTimerApp.dom.visualizerCanvas.style.display = 'block';
-            if(CubeTimerApp.dom.noVisualizerMsg) CubeTimerApp.dom.noVisualizerMsg.classList.add('hidden');
+            const canvas = document.getElementById('cubeVisualizer');
+            const msg = document.getElementById('noVisualizerMsg');
+            if(canvas) canvas.style.display = 'block';
+            if(msg) msg.classList.add('hidden');
             const ctx = this.ctx, faceS = 55, tileS = faceS/n, gap = 4;
             ctx.clearRect(0,0,260,190);
             const offX = (260-(4*faceS+3*gap))/2, offY = (190-(3*faceS+2*gap))/2;
@@ -524,43 +541,24 @@ const CubeTimerApp = {
 
     ui: {
         init() {
-            const ids = [
-                'timer', 'scramble', 'mbfInputArea', 'mbfCubeInput', 'manualInput', 'historyList',
-                'solveCount', 'sessionAvg', 'bestSolve', 'labelPrimaryAvg', 'displayPrimaryAvg', 'displayAo12',
-                'statusHint', 'plus2Btn', 'dnfBtn', 'cubeVisualizer', 'noVisualizerMsg',
-                'avgModeToggle', 'precisionToggle', 'manualEntryToggle', 'darkModeToggle', 'wakeLockToggle',
-                'holdDurationSlider', 'holdDurationValue', 'inspectionToggle', 'timerSection', 'historySection',
-                'mob-tab-timer', 'mob-tab-history', 'btStatusText', 'btModalIcon', 'btInfoPanel', 'btDeviceName',
-                'btDisconnectBtn', 'btConnectBtn', 'timerInteractiveArea', 'visualizerWrapper', 'graphWrapper',
-                'toolsDropdown', 'toolLabel', 'graphLine', 'currentSessionNameDisplay', 'sessionList',
-                'sessionCreateForm', 'newSessionName', 'sessionCountLabel', 'statsContent', 'modalTime',
-                'modalEvent', 'modalScramble', 'shareDate', 'shareLabel', 'shareAvg', 'shareList',
-                'updateVersion', 'updateList', 'mbfScrambleList', 'mbfCubeCountDisplay', 'importInput',
-                'genMbfBtn', 'copyMbfBtn', 'closeMbfBtn', 'copyShareBtn', 'closeShareBtn',
-                'shareSingleBtn', 'useScrambleBtn', 'closeDetailBtn', 'closeUpdateLogBtn', 'closeStatsBtn',
-                'addSessionBtn', 'closeSessionBtn', 'btCloseBtn', 'closeSettingsBtn',
-                'mobBackupBtn', 'mobRestoreBtn', 'settingsOverlay' // Added missing settingsOverlay
-            ];
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if(el) CubeTimerApp.dom[id] = el;
-            });
-            CubeTimerApp.dom.visualizerCanvas = document.getElementById('cubeVisualizer');
-
             this.setupEventListeners();
             this.handleResize();
         },
 
         setupEventListeners() {
-            const D = CubeTimerApp.dom;
             const U = CubeTimerApp.utils;
-            const safeAdd = (el, evt, handler) => { if(el) el.addEventListener(evt, handler); };
+            // Safer element lookup helper
+            const add = (id, evt, handler) => {
+                const el = document.getElementById(id);
+                if(el) el.addEventListener(evt, handler);
+            };
 
             window.addEventListener('keydown', this.handleKeydown.bind(this));
             window.addEventListener('keyup', this.handleKeyup.bind(this));
-            if(D.timerInteractiveArea) {
-                D.timerInteractiveArea.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
-                D.timerInteractiveArea.addEventListener('touchend', (e) => this.handleEnd(e), { passive: false });
+            const interactiveArea = document.getElementById('timerInteractiveArea');
+            if(interactiveArea) {
+                interactiveArea.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
+                interactiveArea.addEventListener('touchend', (e) => this.handleEnd(e), { passive: false });
             }
             window.addEventListener('resize', this.handleResize.bind(this));
 
@@ -573,42 +571,57 @@ const CubeTimerApp = {
             this.bindModal('modalOverlay', 'closeDetailBtn');
             this.bindModal('updateLogOverlay', 'closeUpdateLogBtn');
 
-            safeAdd(document.getElementById('btToggleBtn'), 'click', () => U.openModal('btOverlay'));
-            safeAdd(document.getElementById('backupBtn'), 'click', CubeTimerApp.storage.export);
-            safeAdd(document.getElementById('restoreBtn'), 'click', () => D.importInput && D.importInput.click());
-            safeAdd(D.importInput, 'change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
-            
-            // Explicit settings handlers to ensure connectivity
-            safeAdd(document.getElementById('settingsBtn'), 'click', () => { if(D.settingsOverlay) D.settingsOverlay.classList.add('active'); });
-            safeAdd(document.getElementById('mobSettingsBtn'), 'click', () => { if(D.settingsOverlay) D.settingsOverlay.classList.add('active'); });
+            // Open Modals
+            add('btToggleBtn', 'click', () => U.openModal('btOverlay'));
+            add('settingsBtn', 'click', () => U.openModal('settingsOverlay'));
+            add('mobSettingsBtn', 'click', () => U.openModal('settingsOverlay'));
+            add('sessionSelectBtn', 'click', () => { U.openModal('sessionOverlay'); this.renderSessionList(); });
+            add('moreStatsBtn', 'click', () => U.showExtendedStats());
+            add('clearHistoryBtn', 'click', () => U.clearHistory());
 
-            safeAdd(D.btConnectBtn, 'click', () => CubeTimerApp.bluetooth.connect());
-            safeAdd(D.btDisconnectBtn, 'click', () => CubeTimerApp.bluetooth.disconnect());
-            safeAdd(D.addSessionBtn, 'click', () => this.createNewSession());
-            safeAdd(D.genMbfBtn, 'click', () => U.generateMbfScrambles());
-            safeAdd(D.copyMbfBtn, 'click', () => U.copyMbfText());
-            safeAdd(D.copyShareBtn, 'click', () => U.copyShareText());
-            safeAdd(D.shareSingleBtn, 'click', () => U.openSingleShare());
-            safeAdd(D.useScrambleBtn, 'click', () => U.useThisScramble());
-            safeAdd(document.getElementById('moreStatsBtn'), 'click', () => U.showExtendedStats());
-            safeAdd(document.getElementById('clearHistoryBtn'), 'click', () => U.clearHistory());
-            safeAdd(document.getElementById('sessionSelectBtn'), 'click', () => { U.openModal('sessionOverlay'); this.renderSessionList(); });
+            // Backup/Restore
+            add('backupBtn', 'click', CubeTimerApp.storage.export);
+            add('restoreBtn', 'click', () => { const el = document.getElementById('importInput'); if(el) el.click(); });
+            add('mobBackupBtn', 'click', CubeTimerApp.storage.export);
+            add('mobRestoreBtn', 'click', () => { const el = document.getElementById('importInput'); if(el) el.click(); });
+            add('importInput', 'change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
 
-            safeAdd(D.darkModeToggle, 'change', (e) => U.toggleDarkMode(e.target));
-            safeAdd(D.wakeLockToggle, 'change', (e) => U.toggleWakeLock(e.target));
-            safeAdd(D.inspectionToggle, 'change', (e) => U.toggleInspection(e.target));
-            safeAdd(D.holdDurationSlider, 'input', (e) => U.updateHoldDuration(e.target.value));
-            safeAdd(D.avgModeToggle, 'change', (e) => { CubeTimerApp.state.isAo5Mode = e.target.checked; this.updateHistory(); CubeTimerApp.storage.save(); });
-            safeAdd(D.precisionToggle, 'change', (e) => { CubeTimerApp.state.precision = e.target.checked?3:2; this.updateHistory(); if(D.timer) D.timer.innerText = (0).toFixed(CubeTimerApp.state.precision); CubeTimerApp.storage.save(); });
-            safeAdd(D.manualEntryToggle, 'change', (e) => { 
-                CubeTimerApp.state.isManualMode = e.target.checked; 
-                if(D.timer) D.timer.classList.toggle('hidden', CubeTimerApp.state.isManualMode);
-                if(D.manualInput) D.manualInput.classList.toggle('hidden', !CubeTimerApp.state.isManualMode);
-                if(D.statusHint) D.statusHint.innerText = CubeTimerApp.state.isManualMode ? "TYPE TIME & ENTER" : "HOLD TO READY";
+            // Actions
+            add('btConnectBtn', 'click', () => CubeTimerApp.bluetooth.connect());
+            add('btDisconnectBtn', 'click', () => CubeTimerApp.bluetooth.disconnect());
+            add('addSessionBtn', 'click', () => this.createNewSession());
+            add('genMbfBtn', 'click', () => U.generateMbfScrambles());
+            add('copyMbfBtn', 'click', () => U.copyMbfText());
+            add('copyShareBtn', 'click', () => U.copyShareText());
+            add('shareSingleBtn', 'click', () => U.openSingleShare());
+            add('useScrambleBtn', 'click', () => U.useThisScramble());
+            add('plus2Btn', 'click', () => U.togglePenalty('+2'));
+            add('dnfBtn', 'click', () => U.togglePenalty('DNF'));
+
+            // Settings Inputs
+            add('darkModeToggle', 'change', (e) => U.toggleDarkMode(e.target));
+            add('wakeLockToggle', 'change', (e) => U.toggleWakeLock(e.target));
+            add('inspectionToggle', 'change', (e) => U.toggleInspection(e.target));
+            add('holdDurationSlider', 'input', (e) => U.updateHoldDuration(e.target.value));
+            add('avgModeToggle', 'change', (e) => { CubeTimerApp.state.isAo5Mode = e.target.checked; this.updateHistory(); CubeTimerApp.storage.save(); });
+            add('precisionToggle', 'change', (e) => { 
+                CubeTimerApp.state.precision = e.target.checked?3:2; 
+                this.updateHistory(); 
+                const tEl = document.getElementById('timer');
+                if(tEl) tEl.innerText = (0).toFixed(CubeTimerApp.state.precision); 
+                CubeTimerApp.storage.save(); 
             });
-            safeAdd(D.mobBackupBtn, 'click', CubeTimerApp.storage.export);
-            safeAdd(D.mobRestoreBtn, 'click', () => D.importInput && D.importInput.click());
+            add('manualEntryToggle', 'change', (e) => { 
+                CubeTimerApp.state.isManualMode = e.target.checked; 
+                const tEl = document.getElementById('timer');
+                const mEl = document.getElementById('manualInput');
+                const sEl = document.getElementById('statusHint');
+                if(tEl) tEl.classList.toggle('hidden', CubeTimerApp.state.isManualMode);
+                if(mEl) mEl.classList.toggle('hidden', !CubeTimerApp.state.isManualMode);
+                if(sEl) sEl.innerText = CubeTimerApp.state.isManualMode ? "TYPE TIME & ENTER" : "HOLD TO READY";
+            });
 
+            // Delegated Events
             const catTabs = document.getElementById('categoryTabs');
             if(catTabs) catTabs.addEventListener('click', (e) => {
                 const btn = e.target.closest('.category-btn');
@@ -620,24 +633,35 @@ const CubeTimerApp = {
                     if(tab) this.changeEvent(tab.dataset.event);
                 });
             });
-            safeAdd(D.sessionList, 'click', this.handleSessionListClick.bind(this));
-            safeAdd(D.historyList, 'click', this.handleHistoryListClick.bind(this));
-            safeAdd(D.historyList, 'scroll', this.handleHistoryScroll.bind(this));
+            const sessList = document.getElementById('sessionList');
+            if(sessList) sessList.addEventListener('click', this.handleSessionListClick.bind(this));
             
-            safeAdd(D.plus2Btn, 'click', () => U.togglePenalty('+2'));
-            safeAdd(D.dnfBtn, 'click', () => U.togglePenalty('DNF'));
+            const histList = document.getElementById('historyList');
+            if(histList) {
+                histList.addEventListener('click', this.handleHistoryListClick.bind(this));
+                histList.addEventListener('scroll', this.handleHistoryScroll.bind(this));
+            }
             
-            safeAdd(document.getElementById('toolsMenuBtn'), 'click', (e) => { e.stopPropagation(); if(D.toolsDropdown) D.toolsDropdown.classList.toggle('show'); });
-            safeAdd(D.toolsDropdown, 'click', (e) => {
-                const opt = e.target.closest('.tool-option');
-                if(opt) this.selectTool(opt.dataset.tool);
+            add('toolsMenuBtn', 'click', (e) => { 
+                e.stopPropagation(); 
+                const dd = document.getElementById('toolsDropdown');
+                if(dd) dd.classList.toggle('show'); 
             });
-            window.addEventListener('click', () => { if(D.toolsDropdown) D.toolsDropdown.classList.remove('show'); });
+            const toolsDD = document.getElementById('toolsDropdown');
+            if(toolsDD) {
+                toolsDD.addEventListener('click', (e) => {
+                    const opt = e.target.closest('.tool-option');
+                    if(opt) this.selectTool(opt.dataset.tool);
+                });
+            }
+            window.addEventListener('click', () => { 
+                if(toolsDD) toolsDD.classList.remove('show'); 
+            });
 
-            safeAdd(document.getElementById('mob-tab-timer'), 'click', () => this.switchMobileTab('timer'));
-            safeAdd(document.getElementById('mob-tab-history'), 'click', () => this.switchMobileTab('history'));
-            safeAdd(document.getElementById('primaryAvgBadge'), 'click', () => U.openAvgShare('primary'));
-            safeAdd(document.getElementById('ao12Badge'), 'click', () => U.openAvgShare('ao12'));
+            add('mob-tab-timer', 'click', () => this.switchMobileTab('timer'));
+            add('mob-tab-history', 'click', () => this.switchMobileTab('history'));
+            add('primaryAvgBadge', 'click', () => U.openAvgShare('primary'));
+            add('ao12Badge', 'click', () => U.openAvgShare('ao12'));
         },
 
         bindModal(overlayId, closeBtnId) {
@@ -655,20 +679,24 @@ const CubeTimerApp = {
             if (S.isManualMode || S.isRunning) { if(S.isRunning) CubeTimerApp.timer.stop(); return; }
             if (S.isInspectionMode && S.inspectionState === 'none') return;
             
-            const D = CubeTimerApp.dom;
+            const timerEl = document.getElementById('timer');
+            const statusEl = document.getElementById('statusHint');
+            
             if (S.isInspectionMode && S.inspectionState === 'inspecting') {
                 if (S.isBtConnected) return;
-                D.timer.style.color = '#ef4444'; D.timer.classList.add('holding-status');
+                if(timerEl) { timerEl.style.color = '#ef4444'; timerEl.classList.add('holding-status'); }
                 CubeTimerApp.timer.holdTimer = setTimeout(()=> { 
-                    S.isReady=true; D.timer.style.color = '#10b981'; 
-                    D.timer.classList.replace('holding-status','ready-to-start'); D.statusHint.innerText="Ready!"; 
+                    S.isReady=true; 
+                    if(timerEl) { timerEl.style.color = '#10b981'; timerEl.classList.replace('holding-status','ready-to-start'); }
+                    if(statusEl) statusEl.innerText="Ready!"; 
                 }, S.holdDuration); 
                 return;
             }
-            D.timer.style.color = '#ef4444'; D.timer.classList.add('holding-status');
+            if(timerEl) { timerEl.style.color = '#ef4444'; timerEl.classList.add('holding-status'); }
             CubeTimerApp.timer.holdTimer = setTimeout(()=> { 
-                S.isReady=true; D.timer.style.color = '#10b981'; 
-                D.timer.classList.replace('holding-status','ready-to-start'); D.statusHint.innerText="Ready!"; 
+                S.isReady=true; 
+                if(timerEl) { timerEl.style.color = '#10b981'; timerEl.classList.replace('holding-status','ready-to-start'); }
+                if(statusEl) statusEl.innerText="Ready!"; 
             }, S.holdDuration);
         },
 
@@ -690,24 +718,28 @@ const CubeTimerApp = {
             if (!S.isRunning && S.isReady) {
                 CubeTimerApp.timer.start();
             } else {
-                const D = CubeTimerApp.dom;
-                D.timer.style.color = ''; D.timer.classList.remove('holding-status','ready-to-start');
+                const timerEl = document.getElementById('timer');
+                const statusEl = document.getElementById('statusHint');
+                if(timerEl) { timerEl.style.color = ''; timerEl.classList.remove('holding-status','ready-to-start'); }
                 S.isReady = false;
-                if (!S.isInspectionMode || S.inspectionState === 'none') D.statusHint.innerText = S.isInspectionMode ? "Start Inspection" : "Hold to Ready";
-                else D.timer.style.color = '#ef4444';
+                if(statusEl) {
+                    if (!S.isInspectionMode || S.inspectionState === 'none') statusEl.innerText = S.isInspectionMode ? "Start Inspection" : "Hold to Ready";
+                }
+                else if(timerEl) timerEl.style.color = '#ef4444';
             }
         },
 
         handleKeydown(e) {
             const S = CubeTimerApp.state;
+            const manualInput = document.getElementById('manualInput');
             if (S.editingSessionId || (document.activeElement && document.activeElement.tagName === 'INPUT')) {
-                if (e.code === 'Enter' && document.activeElement === CubeTimerApp.dom.manualInput) { /* allowed */ } else { return; }
+                if (e.code === 'Enter' && document.activeElement === manualInput) { /* allowed */ } else { return; }
             }
             if (e.code === 'Space' && !e.repeat) { e.preventDefault(); this.handleStart(); }
-            if (S.isManualMode && e.code === 'Enter') {
-                let v = parseFloat(CubeTimerApp.dom.manualInput.value);
+            if (S.isManualMode && e.code === 'Enter' && manualInput) {
+                let v = parseFloat(manualInput.value);
                 if (v > 0) CubeTimerApp.timer.stop(v * 1000);
-                CubeTimerApp.dom.manualInput.value = "";
+                manualInput.value = "";
             }
         },
 
@@ -723,7 +755,8 @@ const CubeTimerApp = {
                 const eventSessions = CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent];
                 eventSessions.forEach(s => s.isActive = (s.id === id));
                 this.renderSessionList(); this.updateHistory(); CubeTimerApp.storage.save();
-                if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.innerText = (0).toFixed(CubeTimerApp.state.precision);
+                const timerEl = document.getElementById('timer');
+                if(timerEl) timerEl.innerText = (0).toFixed(CubeTimerApp.state.precision);
                 CubeTimerApp.ui.resetPenaltyButtons();
                 CubeTimerApp.utils.closeModal('sessionOverlay');
             }
@@ -741,7 +774,7 @@ const CubeTimerApp = {
         },
 
         handleHistoryScroll() {
-            const list = CubeTimerApp.dom.historyList;
+            const list = document.getElementById('historyList');
             if (list.scrollTop + list.clientHeight >= list.scrollHeight - 50) {
                 const S = CubeTimerApp.state;
                 const sid = CubeTimerApp.storage.getCurrentSessionId();
@@ -753,72 +786,93 @@ const CubeTimerApp = {
             }
         },
 
-        updateTimerDisplay(ms) { if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.innerText = CubeTimerApp.utils.formatTime(ms); },
+        updateTimerDisplay(ms) { 
+            const el = document.getElementById('timer');
+            if(el) el.innerText = CubeTimerApp.utils.formatTime(ms); 
+        },
         updateInspectionDisplay(sec) {
-            const D = CubeTimerApp.dom;
-            if (sec > 0) D.timer.innerText = Math.ceil(sec);
-            else if (sec > -2) D.timer.innerText = "+2";
-            else D.timer.innerText = "DNF";
+            const el = document.getElementById('timer');
+            if(!el) return;
+            if (sec > 0) el.innerText = Math.ceil(sec);
+            else if (sec > -2) el.innerText = "+2";
+            else el.innerText = "DNF";
         },
         displayFinalTime(ms, penalty) {
-            const D = CubeTimerApp.dom;
-            if (penalty === 'DNF') D.timer.innerText = "DNF";
+            const el = document.getElementById('timer');
+            if(!el) return;
+            if (penalty === 'DNF') el.innerText = "DNF";
             else {
                 let display = CubeTimerApp.utils.formatTime(ms + (penalty === '+2' ? 2000 : 0));
                 if (penalty === '+2') display += "+";
-                D.timer.innerText = display;
+                el.innerText = display;
             }
         },
         setTimerStatus(status) {
-            const D = CubeTimerApp.dom;
+            const statusEl = document.getElementById('statusHint');
+            const timerEl = document.getElementById('timer');
             const hints = {
                 'running': "Timing...",
                 'idle': CubeTimerApp.state.isInspectionMode ? "Start Inspection" : "Hold to Ready",
                 'inspection': "Inspection",
                 'ready': "Ready!"
             };
-            if(D.statusHint) D.statusHint.innerText = hints[status] || hints['idle'];
-            if(status === 'running') { D.timer.classList.add('text-running'); D.timer.classList.remove('text-ready'); }
-            else D.timer.classList.remove('text-running', 'text-ready');
+            if(statusEl) statusEl.innerText = hints[status] || hints['idle'];
+            if(timerEl) {
+                if(status === 'running') { timerEl.classList.add('text-running'); timerEl.classList.remove('text-ready'); }
+                else timerEl.classList.remove('text-running', 'text-ready');
+            }
         },
         resetPenaltyButtons() {
-            const D = CubeTimerApp.dom;
-            if (D.plus2Btn) D.plus2Btn.className = 'penalty-btn inactive';
-            if (D.dnfBtn) D.dnfBtn.className = 'penalty-btn inactive';
+            const p2 = document.getElementById('plus2Btn');
+            const dnf = document.getElementById('dnfBtn');
+            if (p2) p2.className = 'penalty-btn inactive';
+            if (dnf) dnf.className = 'penalty-btn inactive';
         },
         updateBTUI(connected) {
-            const D = CubeTimerApp.dom;
             const icon = document.getElementById('btStatusIcon');
             if(icon) icon.classList.replace(connected ? 'disconnected' : 'connected', connected ? 'connected' : 'disconnected');
-            if(D.btInfoPanel) D.btInfoPanel.classList.toggle('hidden', !connected);
-            if(D.btDisconnectBtn) D.btDisconnectBtn.classList.toggle('hidden', !connected);
-            if(D.btConnectBtn) D.btConnectBtn.classList.toggle('hidden', connected);
+            const panel = document.getElementById('btInfoPanel');
+            if(panel) panel.classList.toggle('hidden', !connected);
+            const disBtn = document.getElementById('btDisconnectBtn');
+            if(disBtn) disBtn.classList.toggle('hidden', !connected);
+            const conBtn = document.getElementById('btConnectBtn');
+            if(conBtn) conBtn.classList.toggle('hidden', connected);
+            
             if(connected) {
-                if(D.btDeviceName) D.btDeviceName.innerText = CubeTimerApp.bluetooth.device.name;
-                if(D.btStatusText) D.btStatusText.innerText = "Timer Connected & Ready";
-                if(D.btModalIcon) D.btModalIcon.classList.remove('bt-pulse');
-                if(D.statusHint) D.statusHint.innerText = "Timer Ready (BT)";
+                const nameEl = document.getElementById('btDeviceName');
+                const statusEl = document.getElementById('btStatusText');
+                const modalIcon = document.getElementById('btModalIcon');
+                const hint = document.getElementById('statusHint');
+                
+                if(nameEl && CubeTimerApp.bluetooth.device) nameEl.innerText = CubeTimerApp.bluetooth.device.name;
+                if(statusEl) statusEl.innerText = "Timer Connected & Ready";
+                if(modalIcon) modalIcon.classList.remove('bt-pulse');
+                if(hint) hint.innerText = "Timer Ready (BT)";
             } else {
-                if(D.btStatusText) D.btStatusText.innerText = "Timer Disconnected";
-                if(D.statusHint) D.statusHint.innerText = "Hold to Ready";
+                const statusEl = document.getElementById('btStatusText');
+                const hint = document.getElementById('statusHint');
+                if(statusEl) statusEl.innerText = "Timer Disconnected";
+                if(hint) hint.innerText = "Hold to Ready";
             }
         },
         syncSettings(settings) {
-            const D = CubeTimerApp.dom;
-            if(D.precisionToggle) D.precisionToggle.checked = (settings.precision === 3);
-            if(D.avgModeToggle) D.avgModeToggle.checked = settings.isAo5Mode;
-            if(D.darkModeToggle) D.darkModeToggle.checked = settings.isDarkMode;
-            if(D.wakeLockToggle) D.wakeLockToggle.checked = settings.isWakeLockEnabled;
-            if(D.inspectionToggle) D.inspectionToggle.checked = settings.isInspectionMode;
+            const get = (id) => document.getElementById(id);
+            const pT = get('precisionToggle'); if(pT) pT.checked = (settings.precision === 3);
+            const aT = get('avgModeToggle'); if(aT) aT.checked = settings.isAo5Mode;
+            const dT = get('darkModeToggle'); if(dT) dT.checked = settings.isDarkMode;
+            const wT = get('wakeLockToggle'); if(wT) wT.checked = settings.isWakeLockEnabled;
+            const iT = get('inspectionToggle'); if(iT) iT.checked = settings.isInspectionMode;
             
-            if (settings.isInspectionMode) CubeTimerApp.utils.toggleInspection(D.inspectionToggle);
+            if (settings.isInspectionMode) CubeTimerApp.utils.toggleInspection(iT);
             else {
-                if(D.holdDurationSlider) {
-                    D.holdDurationSlider.value = settings.holdDuration / 1000;
-                    if(D.holdDurationValue) D.holdDurationValue.innerText = D.holdDurationSlider.value + "s";
+                const sl = get('holdDurationSlider');
+                const sv = get('holdDurationValue');
+                if(sl) {
+                    sl.value = settings.holdDuration / 1000;
+                    if(sv) sv.innerText = sl.value + "s";
                 }
             }
-            CubeTimerApp.utils.toggleDarkMode(D.darkModeToggle);
+            CubeTimerApp.utils.toggleDarkMode(dT);
         },
         switchCategory(cat) {
             if(CubeTimerApp.state.isRunning) return;
@@ -842,7 +896,8 @@ const CubeTimerApp = {
             S.currentEvent = event;
             CubeTimerApp.storage.initSessionIfNeeded(event);
             S.displayedSolvesCount = S.solvesBatchSize;
-            if(CubeTimerApp.dom.historyList) CubeTimerApp.dom.historyList.scrollTop = 0;
+            const hist = document.getElementById('historyList');
+            if(hist) hist.scrollTop = 0;
 
             document.querySelectorAll('.event-tab').forEach(t => {
                 t.classList.remove('active', 'text-white', 'bg-blue-600');
@@ -857,18 +912,23 @@ const CubeTimerApp = {
 
             const isBig = ['666','777','333bf','444bf','555bf','333mbf'].includes(event);
             S.isAo5Mode = !isBig; 
-            if(CubeTimerApp.dom.avgModeToggle) CubeTimerApp.dom.avgModeToggle.checked = !isBig;
+            const avgToggle = document.getElementById('avgModeToggle');
+            if(avgToggle) avgToggle.checked = !isBig;
+
+            const scrEl = document.getElementById('scramble');
+            const mbfEl = document.getElementById('mbfInputArea');
 
             if(event === '333mbf') {
-                if(CubeTimerApp.dom.scramble) CubeTimerApp.dom.scramble.classList.add('hidden');
-                if(CubeTimerApp.dom.mbfInputArea) CubeTimerApp.dom.mbfInputArea.classList.remove('hidden');
+                if(scrEl) scrEl.classList.add('hidden');
+                if(mbfEl) mbfEl.classList.remove('hidden');
             } else {
-                if(CubeTimerApp.dom.scramble) CubeTimerApp.dom.scramble.classList.remove('hidden');
-                if(CubeTimerApp.dom.mbfInputArea) CubeTimerApp.dom.mbfInputArea.classList.add('hidden');
+                if(scrEl) scrEl.classList.remove('hidden');
+                if(mbfEl) mbfEl.classList.add('hidden');
                 CubeTimerApp.scrambler.generate();
             }
             this.updateHistory(); 
-            if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.innerText = (0).toFixed(S.precision); 
+            const tEl = document.getElementById('timer');
+            if(tEl) tEl.innerText = (0).toFixed(S.precision); 
             CubeTimerApp.storage.save();
         },
         updateHistory() {
@@ -877,11 +937,13 @@ const CubeTimerApp = {
             let filtered = S.solves.filter(s => s.event === S.currentEvent && s.sessionId === sid);
             
             const activeSession = (S.sessions[S.currentEvent] || []).find(s => s.isActive);
-            if (activeSession && CubeTimerApp.dom.currentSessionNameDisplay) CubeTimerApp.dom.currentSessionNameDisplay.innerText = activeSession.name;
+            const sessNameEl = document.getElementById('currentSessionNameDisplay');
+            if (activeSession && sessNameEl) sessNameEl.innerText = activeSession.name;
 
             const subset = filtered.slice(0, S.displayedSolvesCount);
-            if(CubeTimerApp.dom.historyList) {
-                CubeTimerApp.dom.historyList.innerHTML = subset.map(s => `
+            const listEl = document.getElementById('historyList');
+            if(listEl) {
+                listEl.innerHTML = subset.map(s => `
                     <div class="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-3 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm transition-all" data-solve-id="${s.id}">
                         <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">${s.penalty==='DNF'?'DNF':CubeTimerApp.utils.formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span>
                         <button class="delete-solve opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400">
@@ -891,23 +953,33 @@ const CubeTimerApp = {
                 `).join('') || '<div class="text-center py-10 text-slate-300 text-[11px] italic">No solves yet</div>';
             }
 
-            if(CubeTimerApp.dom.solveCount) CubeTimerApp.dom.solveCount.innerText = filtered.length;
+            const countEl = document.getElementById('solveCount');
+            if(countEl) countEl.innerText = filtered.length;
+            
             const U = CubeTimerApp.utils;
-            if(CubeTimerApp.dom.labelPrimaryAvg) CubeTimerApp.dom.labelPrimaryAvg.innerText = S.isAo5Mode ? "Ao5" : "Mo3";
-            if(CubeTimerApp.dom.displayPrimaryAvg) CubeTimerApp.dom.displayPrimaryAvg.innerText = U.calculateAvg(filtered, S.isAo5Mode ? 5 : 3, !S.isAo5Mode);
-            if(CubeTimerApp.dom.displayAo12) CubeTimerApp.dom.displayAo12.innerText = U.calculateAvg(filtered, 12);
+            const lp = document.getElementById('labelPrimaryAvg');
+            const dp = document.getElementById('displayPrimaryAvg');
+            const da = document.getElementById('displayAo12');
+            
+            if(lp) lp.innerText = S.isAo5Mode ? "Ao5" : "Mo3";
+            if(dp) dp.innerText = U.calculateAvg(filtered, S.isAo5Mode ? 5 : 3, !S.isAo5Mode);
+            if(da) da.innerText = U.calculateAvg(filtered, 12);
             
             let valid = filtered.filter(s=>s.penalty!=='DNF').map(s=>s.penalty==='+2'?s.time+2000:s.time);
-            if(CubeTimerApp.dom.sessionAvg) CubeTimerApp.dom.sessionAvg.innerText = valid.length ? U.formatTime(valid.reduce((a,b)=>a+b,0)/valid.length) : "-";
-            if(CubeTimerApp.dom.bestSolve) CubeTimerApp.dom.bestSolve.innerText = valid.length ? U.formatTime(Math.min(...valid)) : "-";
+            const sa = document.getElementById('sessionAvg');
+            const bs = document.getElementById('bestSolve');
+            
+            if(sa) sa.innerText = valid.length ? U.formatTime(valid.reduce((a,b)=>a+b,0)/valid.length) : "-";
+            if(bs) bs.innerText = valid.length ? U.formatTime(Math.min(...valid)) : "-";
 
             if (S.activeTool === 'graph') this.renderGraph();
         },
         renderSessionList() {
-            const list = CubeTimerApp.dom.sessionList;
+            const list = document.getElementById('sessionList');
             if(!list) return;
             const sessions = CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent] || [];
-            if(CubeTimerApp.dom.sessionCountLabel) CubeTimerApp.dom.sessionCountLabel.innerText = `${sessions.length}/10`;
+            const countEl = document.getElementById('sessionCountLabel');
+            if(countEl) countEl.innerText = `${sessions.length}/10`;
             
             list.innerHTML = sessions.map(s => {
                 if (CubeTimerApp.state.editingSessionId === s.id) {
@@ -924,10 +996,11 @@ const CubeTimerApp = {
                     input.addEventListener('keydown', (e) => { if(e.key === 'Enter') this.saveSessionName(CubeTimerApp.state.editingSessionId); });
                 }
             }
-            if(CubeTimerApp.dom.sessionCreateForm) CubeTimerApp.dom.sessionCreateForm.classList.toggle('hidden', sessions.length >= 10);
+            const form = document.getElementById('sessionCreateForm');
+            if(form) form.classList.toggle('hidden', sessions.length >= 10);
         },
         createNewSession() {
-            const input = CubeTimerApp.dom.newSessionName;
+            const input = document.getElementById('newSessionName');
             if(!input) return;
             const name = input.value.trim() || `Session ${CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent].length + 1}`;
             if (CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent].length >= 10) return;
@@ -935,7 +1008,9 @@ const CubeTimerApp = {
             CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent].push({ id: Date.now(), name: name, isActive: true });
             input.value = "";
             this.renderSessionList(); this.updateHistory(); CubeTimerApp.storage.save();
-            if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.innerText = (0).toFixed(CubeTimerApp.state.precision); this.resetPenaltyButtons();
+            const tEl = document.getElementById('timer');
+            if(tEl) tEl.innerText = (0).toFixed(CubeTimerApp.state.precision); 
+            this.resetPenaltyButtons();
         },
         deleteSession(id) {
             const eventSessions = CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent];
@@ -959,20 +1034,28 @@ const CubeTimerApp = {
         selectTool(tool) {
             CubeTimerApp.state.activeTool = tool;
             const isBlind = CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind';
-            if(CubeTimerApp.dom.toolLabel) CubeTimerApp.dom.toolLabel.innerText = isBlind ? 'N/A (Blind)' : (tool === 'scramble' ? 'Scramble Image' : 'Graph (Trends)');
-            if(CubeTimerApp.dom.visualizerWrapper) CubeTimerApp.dom.visualizerWrapper.classList.toggle('hidden', tool !== 'scramble');
-            if(CubeTimerApp.dom.graphWrapper) CubeTimerApp.dom.graphWrapper.classList.toggle('hidden', tool !== 'graph');
+            const label = document.getElementById('toolLabel');
+            if(label) label.innerText = isBlind ? 'N/A (Blind)' : (tool === 'scramble' ? 'Scramble Image' : 'Graph (Trends)');
+            
+            const vWrap = document.getElementById('visualizerWrapper');
+            const gWrap = document.getElementById('graphWrapper');
+            if(vWrap) vWrap.classList.toggle('hidden', tool !== 'scramble');
+            if(gWrap) gWrap.classList.toggle('hidden', tool !== 'graph');
+            
             document.querySelectorAll('.tool-option').forEach(opt => opt.classList.remove('active'));
             const activeOpt = document.getElementById(`tool-opt-${tool}`);
             if(activeOpt) activeOpt.classList.add('active');
-            if(CubeTimerApp.dom.toolsDropdown) CubeTimerApp.dom.toolsDropdown.classList.remove('show');
+            
+            const dd = document.getElementById('toolsDropdown');
+            if(dd) dd.classList.remove('show');
+            
             if (tool === 'graph') this.renderGraph(); else if (tool === 'scramble') CubeTimerApp.visualizer.draw();
         },
         renderGraph() {
             const S = CubeTimerApp.state;
             const sid = CubeTimerApp.storage.getCurrentSessionId();
             const filtered = [...S.solves].filter(s => s.event === S.currentEvent && s.sessionId === sid).reverse();
-            const polyline = CubeTimerApp.dom.graphLine;
+            const polyline = document.getElementById('graphLine');
             if(!polyline) return;
             if (filtered.length < 2) { polyline.setAttribute('points', ""); return; }
             const validTimes = filtered.map(s => s.penalty === 'DNF' ? null : (s.penalty === '+2' ? s.time + 2000 : s.time));
@@ -988,28 +1071,31 @@ const CubeTimerApp = {
             polyline.setAttribute('points', points);
         },
         switchMobileTab(tab) {
-            const D = CubeTimerApp.dom;
+            const tSec = document.getElementById('timerSection');
+            const hSec = document.getElementById('historySection');
+            const tBtn = document.getElementById('mob-tab-timer');
+            const hBtn = document.getElementById('mob-tab-history');
+
             if (tab === 'timer') {
-                if(D.timerSection) D.timerSection.classList.remove('hidden'); 
-                if(D.historySection) D.historySection.classList.add('hidden');
-                const tBtn = document.getElementById('mob-tab-timer');
-                const hBtn = document.getElementById('mob-tab-history');
+                if(tSec) tSec.classList.remove('hidden'); 
+                if(hSec) hSec.classList.add('hidden');
                 if(tBtn) tBtn.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
                 if(hBtn) hBtn.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
             } else {
-                if(D.timerSection) D.timerSection.classList.add('hidden'); 
-                if(D.historySection) { D.historySection.classList.remove('hidden'); D.historySection.classList.add('flex'); }
-                const tBtn = document.getElementById('mob-tab-timer');
-                const hBtn = document.getElementById('mob-tab-history');
+                if(tSec) tSec.classList.add('hidden'); 
+                if(hSec) { hSec.classList.remove('hidden'); hSec.classList.add('flex'); }
                 if(hBtn) hBtn.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
                 if(tBtn) tBtn.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
                 if(CubeTimerApp.state.activeTool === 'graph') this.renderGraph();
             }
         },
         handleResize() {
+            const tSec = document.getElementById('timerSection');
+            const hSec = document.getElementById('historySection');
+            
             if (window.innerWidth >= 768) {
-                if(CubeTimerApp.dom.timerSection) CubeTimerApp.dom.timerSection.classList.remove('hidden');
-                if(CubeTimerApp.dom.historySection) { CubeTimerApp.dom.historySection.classList.remove('hidden'); CubeTimerApp.dom.historySection.classList.add('flex'); }
+                if(tSec) tSec.classList.remove('hidden');
+                if(hSec) { hSec.classList.remove('hidden'); hSec.classList.add('flex'); }
             } else {
                 const tBtn = document.getElementById('mob-tab-timer');
                 if (tBtn && tBtn.classList.contains('text-blue-600')) this.switchMobileTab('timer');
@@ -1076,7 +1162,7 @@ const CubeTimerApp = {
         },
         toggleInspection(el) {
             CubeTimerApp.state.isInspectionMode = el && el.checked;
-            const slider = CubeTimerApp.dom.holdDurationSlider;
+            const slider = document.getElementById('holdDurationSlider');
             const container = document.getElementById('holdDurationContainer');
             if (el && el.checked) { 
                 this.updateHoldDuration(0.01); 
@@ -1091,7 +1177,8 @@ const CubeTimerApp = {
         },
         updateHoldDuration(val) {
             CubeTimerApp.state.holdDuration = parseFloat(val) * 1000;
-            if(CubeTimerApp.dom.holdDurationValue) CubeTimerApp.dom.holdDurationValue.innerText = val < 0.1 ? "Instant" : val + "s";
+            const valEl = document.getElementById('holdDurationValue');
+            if(valEl) valEl.innerText = val < 0.1 ? "Instant" : val + "s";
             CubeTimerApp.storage.save();
         },
         togglePenalty(p) {
@@ -1103,16 +1190,18 @@ const CubeTimerApp = {
             const target = list[0];
             target.penalty = (target.penalty===p)?null:p;
             
-            const D = CubeTimerApp.dom;
-            if(D.timer) {
-                if (target.penalty === 'DNF') D.timer.innerText = 'DNF';
+            const timerEl = document.getElementById('timer');
+            if(timerEl) {
+                if (target.penalty === 'DNF') timerEl.innerText = 'DNF';
                 else {
                     const t = target.time + (target.penalty === '+2' ? 2000 : 0);
-                    D.timer.innerText = this.formatTime(t) + (target.penalty === '+2' ? '+' : '');
+                    timerEl.innerText = this.formatTime(t) + (target.penalty === '+2' ? '+' : '');
                 }
             }
-            if (D.plus2Btn) D.plus2Btn.className = `penalty-btn ${target.penalty==='+2'?'active-plus2':'inactive'}`;
-            if (D.dnfBtn) D.dnfBtn.className = `penalty-btn ${target.penalty==='DNF'?'active-dnf':'inactive'}`;
+            const p2 = document.getElementById('plus2Btn');
+            const dnf = document.getElementById('dnfBtn');
+            if (p2) p2.className = `penalty-btn ${target.penalty==='+2'?'active-plus2':'inactive'}`;
+            if (dnf) dnf.className = `penalty-btn ${target.penalty==='DNF'?'active-dnf':'inactive'}`;
             CubeTimerApp.ui.updateHistory(); CubeTimerApp.storage.save();
         },
         openAvgShare(type) {
@@ -1124,27 +1213,41 @@ const CubeTimerApp = {
             const list = filtered.slice(0, count);
             const avg = this.calculateAvg(filtered, count, (type === 'primary' && !S.isAo5Mode));
             
-            if(CubeTimerApp.dom.shareDate) CubeTimerApp.dom.shareDate.innerText = `Date : ${list[0].date}`;
-            if(CubeTimerApp.dom.shareLabel) CubeTimerApp.dom.shareLabel.innerText = (type === 'primary' && !S.isAo5Mode) ? `Mean of 3 :` : `Average of ${count} :`;
-            if(CubeTimerApp.dom.shareAvg) CubeTimerApp.dom.shareAvg.innerText = avg;
-            if(CubeTimerApp.dom.shareList) CubeTimerApp.dom.shareList.innerHTML = list.map((s, idx) => `<div class="flex flex-col p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-slate-400 w-4">${count - idx}.</span><span class="font-bold text-slate-800 dark:text-slate-200 text-sm min-w-[50px]">${s.penalty==='DNF'?'DNF':this.formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span><span class="text-[10px] text-slate-400 font-medium italic truncate flex-grow">${s.scramble}</span></div></div>`).reverse().join('');
+            const sd = document.getElementById('shareDate');
+            const sl = document.getElementById('shareLabel');
+            const sa = document.getElementById('shareAvg');
+            const sli = document.getElementById('shareList');
+
+            if(sd) sd.innerText = `Date : ${list[0].date}`;
+            if(sl) sl.innerText = (type === 'primary' && !S.isAo5Mode) ? `Mean of 3 :` : `Average of ${count} :`;
+            if(sa) sa.innerText = avg;
+            if(sli) sli.innerHTML = list.map((s, idx) => `<div class="flex flex-col p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-slate-400 w-4">${count - idx}.</span><span class="font-bold text-slate-800 dark:text-slate-200 text-sm min-w-[50px]">${s.penalty==='DNF'?'DNF':this.formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span><span class="text-[10px] text-slate-400 font-medium italic truncate flex-grow">${s.scramble}</span></div></div>`).reverse().join('');
             this.openModal('avgShareOverlay');
         },
         openSingleShare() {
             const s = CubeTimerApp.state.solves.find(x => x.id === CubeTimerApp.state.selectedSolveId);
             if (!s) return;
             this.closeModal('modalOverlay');
-            if(CubeTimerApp.dom.shareDate) CubeTimerApp.dom.shareDate.innerText = `Date : ${s.date}`;
-            if(CubeTimerApp.dom.shareLabel) CubeTimerApp.dom.shareLabel.innerText = `Single :`;
-            if(CubeTimerApp.dom.shareAvg) CubeTimerApp.dom.shareAvg.innerText = s.penalty==='DNF'?'DNF':this.formatTime(s.penalty==='+2'?s.time+2000:s.time) + (s.penalty==='+2'?'+':'');
-            if(CubeTimerApp.dom.shareList) CubeTimerApp.dom.shareList.innerHTML = `<div class="flex flex-col p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-slate-400 w-4">1.</span><span class="font-bold text-slate-800 dark:text-slate-200 text-sm min-w-[50px]">${s.penalty==='DNF'?'DNF':this.formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span><span class="text-[10px] text-slate-400 font-medium italic truncate flex-grow">${s.scramble}</span></div></div>`;
+            
+            const sd = document.getElementById('shareDate');
+            const sl = document.getElementById('shareLabel');
+            const sa = document.getElementById('shareAvg');
+            const sli = document.getElementById('shareList');
+
+            if(sd) sd.innerText = `Date : ${s.date}`;
+            if(sl) sl.innerText = `Single :`;
+            if(sa) sa.innerText = s.penalty==='DNF'?'DNF':this.formatTime(s.penalty==='+2'?s.time+2000:s.time) + (s.penalty==='+2'?'+':'');
+            if(sli) sli.innerHTML = `<div class="flex flex-col p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700"><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-slate-400 w-4">1.</span><span class="font-bold text-slate-800 dark:text-slate-200 text-sm min-w-[50px]">${s.penalty==='DNF'?'DNF':this.formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span><span class="text-[10px] text-slate-400 font-medium italic truncate flex-grow">${s.scramble}</span></div></div>`;
             this.openModal('avgShareOverlay');
         },
         copyShareText() {
-            const D = CubeTimerApp.dom;
-            const date = D.shareDate ? D.shareDate.innerText : '';
-            const label = D.shareLabel ? D.shareLabel.innerText : '';
-            const val = D.shareAvg ? D.shareAvg.innerText : '';
+            const sd = document.getElementById('shareDate');
+            const sl = document.getElementById('shareLabel');
+            const sa = document.getElementById('shareAvg');
+            
+            const date = sd ? sd.innerText : '';
+            const label = sl ? sl.innerText : '';
+            const val = sa ? sa.innerText : '';
             let text = `[CubeTimer]\n\n${date}\n\n${label} ${val}\n\n`;
             if (label.includes('Single')) {
                 const s = CubeTimerApp.state.solves.find(x => x.id === CubeTimerApp.state.selectedSolveId);
@@ -1180,7 +1283,8 @@ const CubeTimerApp = {
             const s = CubeTimerApp.state.solves.find(x => x.id === CubeTimerApp.state.selectedSolveId);
             if(s) { 
                 CubeTimerApp.state.currentScramble = s.scramble; 
-                if(CubeTimerApp.dom.scramble) CubeTimerApp.dom.scramble.innerText = s.scramble; 
+                const scrEl = document.getElementById('scramble');
+                if(scrEl) scrEl.innerText = s.scramble; 
                 this.closeModal('modalOverlay'); 
             }
         },
@@ -1210,14 +1314,16 @@ const CubeTimerApp = {
             if(confirm) confirm.onclick = () => {
                 CubeTimerApp.state.solves = CubeTimerApp.state.solves.filter(s => !(s.event === CubeTimerApp.state.currentEvent && s.sessionId === sid));
                 CubeTimerApp.ui.updateHistory(); CubeTimerApp.storage.save();
-                if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.innerText = (0).toFixed(CubeTimerApp.state.precision); 
+                const timerEl = document.getElementById('timer');
+                if(timerEl) timerEl.innerText = (0).toFixed(CubeTimerApp.state.precision); 
                 CubeTimerApp.ui.resetPenaltyButtons();
                 document.body.removeChild(div);
             };
         },
         generateMbfScrambles() {
-            if(!CubeTimerApp.dom.mbfCubeInput) return;
-            const count = parseInt(CubeTimerApp.dom.mbfCubeInput.value);
+            const input = document.getElementById('mbfCubeInput');
+            if(!input) return;
+            const count = parseInt(input.value);
             if (!count || count < 2 || count > 100) return;
             const list = document.getElementById('mbfScrambleList');
             if(document.getElementById('mbfCubeCountDisplay')) document.getElementById('mbfCubeCountDisplay').innerText = `${count} Cubes`;
@@ -1244,7 +1350,9 @@ const CubeTimerApp = {
 document.addEventListener('DOMContentLoaded', () => {
     CubeTimerApp.ui.init();
     CubeTimerApp.storage.load();
-    // Start with the event loaded from storage (or default 333)
-    CubeTimerApp.ui.changeEvent(CubeTimerApp.state.currentEvent || '333');
-    CubeTimerApp.utils.checkUpdateLog();
+    // DOM 렌더링이 확실히 끝난 후 실행되도록 지연
+    setTimeout(() => {
+        CubeTimerApp.ui.changeEvent(CubeTimerApp.state.currentEvent || '333');
+        CubeTimerApp.utils.checkUpdateLog();
+    }, 0);
 });
