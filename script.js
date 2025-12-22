@@ -1,10 +1,9 @@
 /**
  * Cube Timer Application
- * Fixed: Settings modal not appearing & Timer color issue
+ * Now with Full Twisty Puzzle Support via cubing.js
  */
 
 const CubeTimerApp = {
-    // --- State Management ---
     state: {
         solves: [],
         sessions: {},
@@ -37,43 +36,38 @@ const CubeTimerApp = {
         isBtConnected: false
     },
 
-    // --- Configuration ---
     config: {
         appVersion: '1.2',
         updateLogs: [
+            "Etc. 종목(메가밍크스, 피라밍크스 등) 스크램블 이미지 지원",
             "설정 팝업 버그 수정",
-            "초기 로딩 시 스크램블 미표시 현상 수정",
-            "모바일 UI 개편 및 안정성 강화"
+            "초기화 안정성 개선"
         ],
         events: {
-            '333': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'standard' },
-            '333oh': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'standard' },
-            '222': { moves: ["U","R","F"], len: 11, n: 2, cat: 'standard' },
-            '444': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, n: 4, cat: 'standard' },
-            '555': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, n: 5, cat: 'standard' },
-            '666': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Rw","3Fw"], len: 80, n: 6, cat: 'standard' },
-            '777': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Dw","3Lw","3Rw","3Fw","3Bw"], len: 100, n: 7, cat: 'standard' },
-            'minx': { moves: ["R++","R--","D++","D--"], len: 77, cat: 'nonstandard' },
-            'pyra': { moves: ["U","L","R","B"], len: 10, tips: ["u","l","r","b"], cat: 'nonstandard' },
-            'clock': { len: 18, cat: 'nonstandard' },
-            'skewb': { moves: ["U","L","R","B"], len: 10, cat: 'nonstandard' },
-            'sq1': { len: 12, cat: 'nonstandard' },
-            '333bf': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'blind' },
-            '444bf': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, n: 4, cat: 'blind' },
-            '555bf': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, n: 5, cat: 'blind' },
-            '333mbf': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'blind' }
+            '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
+            '333oh': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
+            '222': { moves: ["U","R","F"], len: 11, cat: 'standard', puzzle: '2x2x2' },
+            '444': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, cat: 'standard', puzzle: '4x4x4' },
+            '555': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, cat: 'standard', puzzle: '5x5x5' },
+            '666': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Rw","3Fw"], len: 80, cat: 'standard', puzzle: '6x6x6' },
+            '777': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Dw","3Lw","3Rw","3Fw","3Bw"], len: 100, cat: 'standard', puzzle: '7x7x7' },
+            'minx': { moves: ["R++","R--","D++","D--"], len: 77, cat: 'nonstandard', puzzle: 'megaminx' },
+            'pyra': { moves: ["U","L","R","B"], len: 10, tips: ["u","l","r","b"], cat: 'nonstandard', puzzle: 'pyraminx' },
+            'clock': { len: 18, cat: 'nonstandard', puzzle: 'clock' },
+            'skewb': { moves: ["U","L","R","B"], len: 10, cat: 'nonstandard', puzzle: 'skewb' },
+            'sq1': { len: 12, cat: 'nonstandard', puzzle: 'square1' },
+            '333bf': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'blind', puzzle: '3x3x3' },
+            '444bf': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, cat: 'blind', puzzle: '4x4x4' },
+            '555bf': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, cat: 'blind', puzzle: '5x5x5' },
+            '333mbf': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'blind', puzzle: '3x3x3' }
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
-        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
     },
 
-    // --- DOM Cache (Populated on init) ---
     dom: {},
 
-    // --- Core Modules ---
-    
     timer: {
         interval: null,
         holdTimer: null,
@@ -82,8 +76,6 @@ const CubeTimerApp = {
         start() {
             if(this.inspectionInterval) clearInterval(this.inspectionInterval); 
             CubeTimerApp.state.inspectionState = 'none';
-            
-            // [FIX] Start 시 색상 초기화 (초록색 제거)
             if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.style.color = '';
 
             CubeTimerApp.state.startTime = Date.now(); 
@@ -99,7 +91,6 @@ const CubeTimerApp = {
             let elapsed = forcedTime !== null ? forcedTime : (Date.now() - CubeTimerApp.state.startTime);
             CubeTimerApp.state.lastStopTimestamp = Date.now(); 
             
-            // [FIX] Stop 시 색상 초기화 (확실하게 검은색/흰색으로 복구)
             if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.style.color = '';
             
             let finalPenalty = CubeTimerApp.state.inspectionPenalty; 
@@ -160,7 +151,6 @@ const CubeTimerApp = {
         stopInspection() {
             if(this.inspectionInterval) clearInterval(this.inspectionInterval);
             CubeTimerApp.state.inspectionState = 'none';
-            // [FIX] 인스펙션 중단 시 색상 초기화
             if(CubeTimerApp.dom.timer) CubeTimerApp.dom.timer.style.color = '';
             
             if (CubeTimerApp.state.isInspectionMode && CubeTimerApp.state.inspectionStartTime > 0) {
@@ -180,6 +170,7 @@ const CubeTimerApp = {
 
             let res = [];
             
+            // Logic for scrambles
             if (event === 'minx') this.generateMinx(res);
             else if (event === 'clock') this.generateClock(res);
             else if (event === 'sq1') this.generateSq1(res);
@@ -190,15 +181,8 @@ const CubeTimerApp = {
             const scrEl = document.getElementById('scramble');
             if(scrEl) scrEl.innerText = CubeTimerApp.state.currentScramble;
             
-            // Visualizer
-            if (conf.n) { 
-                CubeTimerApp.visualizer.init(conf.n);
-                const moves = CubeTimerApp.state.currentScramble.split(/\s+/).filter(s => s && !CubeTimerApp.config.orientations.includes(s) && s!=='y2');
-                moves.forEach(m => CubeTimerApp.visualizer.applyMove(m));
-                CubeTimerApp.visualizer.draw();
-            } else {
-                CubeTimerApp.visualizer.clear();
-            }
+            // --- NEW Visualizer Logic using Twisty Player ---
+            CubeTimerApp.visualizer.update(conf.puzzle, CubeTimerApp.state.currentScramble);
 
             CubeTimerApp.ui.resetPenaltyButtons();
             if (CubeTimerApp.state.activeTool === 'graph') CubeTimerApp.ui.renderGraph();
@@ -217,7 +201,6 @@ const CubeTimerApp = {
             }
         },
         generateClock(res) {
-            res.length = 0;
             ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"].forEach(d => {
                 const v = Math.floor(Math.random() * 12) - 5;
                 res.push(`${d}${v >= 0 ? '+' : ''}${v}`);
@@ -270,7 +253,6 @@ const CubeTimerApp = {
             let lastAxis = -1, secondLastAxis = -1, lastMoveBase = "";
             const getAxis = (m) => { const c = m[0]; return "UD".includes(c)?0:"LR".includes(c)?1:2; };
             const suffixes = CubeTimerApp.config.suffixes;
-            
             for (let i = 0; i < conf.len; i++) {
                 let move, axis, base, valid = false;
                 while (!valid) {
@@ -489,70 +471,35 @@ const CubeTimerApp = {
     },
 
     visualizer: {
-        cubeState: {},
-        ctx: null,
-        
-        init(n) {
-            this.cubeState = { n };
-            const C = CubeTimerApp.config.cubeColors;
-            ['U','D','L','R','F','B'].forEach(f => this.cubeState[f] = Array(n*n).fill(C[f]));
-            const cvs = document.getElementById('cubeVisualizer');
-            if(cvs) this.ctx = cvs.getContext('2d');
-        },
-        clear() {
-            const cvs = document.getElementById('cubeVisualizer');
-            const msg = document.getElementById('noVisualizerMsg');
-            if(!cvs) return;
-            cvs.style.display = 'none';
-            if(msg) {
-                msg.classList.remove('hidden');
-                if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
-                    msg.innerText = "Scramble images disabled for Blind";
-                } else {
-                    msg.innerText = "Visualizer for standard cubes only";
-                }
-            }
-        },
-        rotateFace(fName) {
-            const n = this.cubeState.n, f = this.cubeState[fName], next = Array(n*n);
-            for(let r=0;r<n;r++) for(let c=0;c<n;c++) next[c*n+(n-1-r)] = f[r*n+c];
-            this.cubeState[fName] = next;
-        },
-        applyMove(move) {
-            const n = this.cubeState.n; if(!n) return;
-            let base = move[0], layer = 1;
-            if(move.includes('w')) { if(/^\d/.test(move)) { layer = parseInt(move[0]); base = move[1]; } else { layer = 2; base = move[0]; } }
-            const reps = move.includes("'") ? 3 : (move.includes("2") ? 2 : 1);
+        update(puzzleId, scramble) {
+            const container = document.getElementById('cubeVisualizer');
+            if(!container) return;
             
-            for(let r=0; r<reps; r++) {
-                for(let l=1; l<=layer; l++) {
-                    if(l===1) this.rotateFace(base);
-                    const d = l-1, last = n-1-d, S = this.cubeState;
-                    if(base==='U') for(let i=0;i<n;i++) { let t=S.F[d*n+i]; S.F[d*n+i]=S.R[d*n+i]; S.R[d*n+i]=S.B[d*n+i]; S.B[d*n+i]=S.L[d*n+i]; S.L[d*n+i]=t; }
-                    else if(base==='D') for(let i=0;i<n;i++) { let t=S.F[last*n+i]; S.F[last*n+i]=S.L[last*n+i]; S.L[last*n+i]=S.B[last*n+i]; S.B[last*n+i]=S.R[last*n+i]; S.R[last*n+i]=t; }
-                    else if(base==='L') for(let i=0;i<n;i++) { let t=S.F[i*n+d]; S.F[i*n+d]=S.U[i*n+d]; S.U[i*n+d]=S.B[(n-1-i)*n+(n-1-d)]; S.B[(n-1-i)*n+(n-1-d)]=S.D[i*n+d]; S.D[i*n+d]=t; }
-                    else if(base==='R') for(let i=0;i<n;i++) { let t=S.F[i*n+last]; S.F[i*n+last]=S.D[i*n+last]; S.D[i*n+last]=S.B[(n-1-i)*n+d]; S.B[(n-1-i)*n+d]=S.U[i*n+last]; S.U[i*n+last]=t; }
-                    else if(base==='F') for(let i=0;i<n;i++) { let t=S.U[last*n+i]; S.U[last*n+i]=S.L[(n-1-i)*n+last]; S.L[(n-1-i)*n+last]=S.D[d*n+(n-1-i)]; S.D[d*n+(n-1-i)]=S.R[i*n+d]; S.R[i*n+d]=t; }
-                    else if(base==='B') for(let i=0;i<n;i++) { let t=S.U[d*n+i]; S.U[d*n+i]=S.R[i*n+last]; S.R[i*n+last]=S.D[last*n+(n-1-i)]; S.D[last*n+(n-1-i)]=S.L[(n-1-i)*n+d]; S.L[(n-1-i)*n+d]=t; }
-                }
-            }
-        },
-        draw() {
-            if(!this.ctx) return;
-            const n = this.cubeState.n;
-            const cvs = document.getElementById('cubeVisualizer');
             const msg = document.getElementById('noVisualizerMsg');
-            if(cvs) cvs.style.display = 'block';
             if(msg) msg.classList.add('hidden');
-            const ctx = this.ctx, faceS = 55, tileS = faceS/n, gap = 4;
-            ctx.clearRect(0,0,260,190);
-            const offX = (260-(4*faceS+3*gap))/2, offY = (190-(3*faceS+2*gap))/2;
-            const drawF = (f,x,y) => this.cubeState[f].forEach((c,i) => {
-                ctx.fillStyle=c; ctx.fillRect(x+(i%n)*tileS, y+Math.floor(i/n)*tileS, tileS, tileS);
-                ctx.strokeStyle='#1e293b'; ctx.lineWidth=n>5?0.2:0.5; ctx.strokeRect(x+(i%n)*tileS, y+Math.floor(i/n)*tileS, tileS, tileS);
-            });
-            drawF('U', offX+faceS+gap, offY); drawF('L', offX, offY+faceS+gap); drawF('F', offX+faceS+gap, offY+faceS+gap);
-            drawF('R', offX+2*(faceS+gap), offY+faceS+gap); drawF('B', offX+3*(faceS+gap), offY+faceS+gap); drawF('D', offX+faceS+gap, offY+2*(faceS+gap));
+            container.style.display = 'flex';
+
+            // Clear previous
+            container.innerHTML = '';
+            
+            if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
+               if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
+               container.style.display = 'none';
+               return;
+            }
+
+            // Create Twisty Player
+            // Note: We use string construction to avoid import issues, browser handles custom element
+            const player = document.createElement('twisty-player');
+            player.setAttribute('puzzle', puzzleId);
+            player.setAttribute('alg', scramble);
+            player.setAttribute('visualization', '2D');
+            player.setAttribute('background', 'none');
+            player.setAttribute('control-panel', 'none');
+            // Prevent interactivity to keep it as an image
+            player.style.pointerEvents = "none"; 
+            
+            container.appendChild(player);
         }
     },
 
@@ -580,7 +527,6 @@ const CubeTimerApp = {
                 const el = document.getElementById(id);
                 if(el) CubeTimerApp.dom[id] = el;
             });
-            CubeTimerApp.dom.visualizerCanvas = document.getElementById('cubeVisualizer');
 
             this.setupEventListeners();
             this.handleResize();
@@ -607,7 +553,7 @@ const CubeTimerApp = {
             this.bindModal('mbfScrambleOverlay', 'closeMbfBtn');
             this.bindModal('statsOverlay', 'closeStatsBtn');
             
-            // [FIX] Settings Modal Logic - Special handling for animation classes
+            // Settings Modal Logic
             const sOv = document.getElementById('settingsOverlay');
             if(sOv) sOv.addEventListener('click', (e) => { if(e.target === sOv) U.closeSettingsModal(); });
             const sCl = document.getElementById('closeSettingsBtn');
@@ -623,7 +569,6 @@ const CubeTimerApp = {
             const imp = document.getElementById('importInput');
             if(imp) imp.addEventListener('change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
             
-            // [FIX] Explicit Settings Open Handlers
             safeAdd('settingsBtn', 'click', () => U.openSettingsModal());
             safeAdd('mobSettingsBtn', 'click', () => U.openSettingsModal());
 
@@ -961,14 +906,13 @@ const CubeTimerApp = {
             const scrEl = document.getElementById('scramble');
             const mbfEl = document.getElementById('mbfInputArea');
 
-            // Force visibility toggle directly to ensure init
             if(event === '333mbf') {
                 if(scrEl) scrEl.classList.add('hidden');
                 if(mbfEl) mbfEl.classList.remove('hidden');
             } else {
                 if(scrEl) {
                     scrEl.classList.remove('hidden');
-                    CubeTimerApp.scrambler.generate(); // Force generation
+                    CubeTimerApp.scrambler.generate();
                 }
                 if(mbfEl) mbfEl.classList.add('hidden');
             }
@@ -1175,21 +1119,18 @@ const CubeTimerApp = {
                 window.speechSynthesis.speak(utterance);
             }
         },
-        // [FIX] Open Modal handles specific Settings animation with delay
         openModal(id) { 
             const el = document.getElementById(id); 
             if(el) { 
                 el.classList.add('active'); 
                 if(id === 'settingsOverlay') {
                     const content = document.getElementById('settingsModal');
-                    // Force reflow
-                    void content.offsetWidth;
+                    void content.offsetWidth; // Force Reflow
                     if(content) setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 50);
                 }
                 if(id === 'sessionOverlay') CubeTimerApp.ui.renderSessionList(); 
             }
         },
-        // [FIX] Specific Settings Close Animation
         closeModal(id) { 
             const el = document.getElementById(id);
             if(el) {
@@ -1413,11 +1354,11 @@ const CubeTimerApp = {
     }
 };
 
-// Initialize App with a slight delay to ensure DOM is fully ready
+// Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     CubeTimerApp.ui.init();
     CubeTimerApp.storage.load();
-    // Force a re-render after a short delay to fix blank state issues
+    // [FIX] Force update on init with a tiny delay to ensure DOM is ready
     setTimeout(() => {
         CubeTimerApp.ui.changeEvent(CubeTimerApp.state.currentEvent || '333');
         CubeTimerApp.utils.checkUpdateLog();
