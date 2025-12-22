@@ -43,10 +43,11 @@ const State = {
 
 // 2. Configuration
 const Config = {
-    appVersion: '1.4.6',
+    appVersion: '1.4.7',
     updateLogs: [
         "Visualizer 렌더링 충돌 완벽 수정",
-        "TwistyPlayer 생명주기 관리 최적화"
+        "TwistyPlayer 생명주기 관리 최적화",
+        "모든 퍼즐 정상 지원"
     ],
     events: {
         '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -574,92 +575,54 @@ const Storage = {
     }
 };
 
-// 8. Visualizer Module
+// 8. Visualizer Module (Visualizer Updated for Recreation Strategy)
 const Visualizer = {
-    player: null,
-
-    init() {
+    update(puzzleId, scramble) {
         const container = Dom.get('cubeVisualizer');
         if (!container) return;
 
-        // Try to create the player if library is ready and not already created
-        if (window.TwistyPlayer && !this.player) {
-            try {
-                this.player = new window.TwistyPlayer({
-                    puzzle: "3x3x3",
-                    visualization: '2D',
-                    background: 'none',
-                    controlPanel: 'none'
-                });
-                
-                // Style settings
-                this.player.style.width = "100%";
-                this.player.style.height = "100%";
-                this.player.style.pointerEvents = "none";
-                
-                container.appendChild(this.player);
-                State.visualizerPuzzleId = "3x3x3";
-            } catch (e) {
-                console.error("Visualizer Init Failed:", e);
-            }
-        } else if (!window.TwistyPlayer) {
-            // Retry init if library not loaded yet
-            setTimeout(() => this.init(), 500);
-        }
-    },
-
-    setPuzzle(newPuzzle) {
-        if (!this.player) return;
-        
-        // 1. Clear alg first
-        this.player.alg = "";
-        
-        // 2. Change puzzle in next frame
-        requestAnimationFrame(() => {
-            this.player.puzzle = newPuzzle;
-        });
-    },
-
-    update(puzzleId, scramble) {
-        const container = Dom.get('cubeVisualizer');
-        const msg = Dom.get('noVisualizerMsg');
+        // 1. Blind Handling
         const isBlind = Config.events[State.currentEvent]?.cat === 'blind';
-        
-        // Handle Blind Events
         if (isBlind) {
-            if (msg) {
-                msg.classList.remove('hidden');
-                msg.innerText = "Scramble images disabled for Blind";
-            }
-            if (this.player) this.player.style.display = 'none';
+            container.style.display = 'none';
             return;
         }
+        
+        container.style.display = 'flex';
+        const msg = Dom.get('noVisualizerMsg');
+        if(msg) msg.classList.add('hidden');
 
-        // Show player
-        if (msg) msg.classList.add('hidden');
-        if (this.player) this.player.style.display = 'block';
-
-        // Ensure Player Exists
-        if (!this.player) {
-            this.init();
-            return; // Will retry in init()
-        }
-
-        // Safe Update Logic
-        if (State.visualizerPuzzleId !== puzzleId) {
+        // 2. Safe Recreation Logic
+        // If the requested puzzle type is different from what's currently rendered,
+        // or if there is no player element, we clear the container and create a fresh one.
+        // This avoids "Bad position" / "children undefined" errors in cubing.js.
+        if (State.visualizerPuzzleId !== puzzleId || !container.querySelector('twisty-player')) {
+            container.innerHTML = ''; // Safe Clear
+            
+            // Create new element
+            const player = document.createElement('twisty-player');
+            
+            // Set attributes strictly
+            player.setAttribute('puzzle', puzzleId);
+            player.setAttribute('alg', scramble || '');
+            player.setAttribute('visualization', '2D');
+            player.setAttribute('background', 'none');
+            player.setAttribute('control-panel', 'none');
+            
+            // Apply styles
+            player.style.width = "100%";
+            player.style.height = "100%";
+            player.style.pointerEvents = "none";
+            
+            container.appendChild(player);
+            
+            // Update State
             State.visualizerPuzzleId = puzzleId;
-            this.setPuzzle(puzzleId);
-            // Defer alg setting to ensure puzzle has changed
-            if (scramble) {
-                setTimeout(() => {
-                    if (this.player && State.visualizerPuzzleId === puzzleId) {
-                        this.player.alg = scramble;
-                    }
-                }, 50); // Slight delay to ensure rAF has fired
-            }
         } else {
-            if (scramble) {
-                this.player.alg = scramble;
+            // Same puzzle type -> Safe to just update alg attribute
+            const player = container.querySelector('twisty-player');
+            if (player) {
+                player.setAttribute('alg', scramble || '');
             }
         }
     },
@@ -668,7 +631,7 @@ const Visualizer = {
         const event = State.currentEvent;
         const conf = Config.events[event];
         const scramble = State.currentScramble;
-        if (conf && scramble) {
+        if (conf) {
             this.update(conf.puzzle, scramble);
         }
     }
@@ -755,569 +718,10 @@ const Bluetooth = {
     }
 };
 
-// 10. UI Module
-const UI = {
-    init() { this.setupEventListeners(); this.handleResize(); },
-    
-    setupEventListeners() {
-        const safeAdd = (id, evt, handler) => {
-            const el = Dom.get(id);
-            if(el) el.addEventListener(evt, handler);
-        };
-
-        window.addEventListener('keydown', this.handleKeydown.bind(this));
-        window.addEventListener('keyup', this.handleKeyup.bind(this));
-        const iArea = Dom.get('timerInteractiveArea');
-        if(iArea) {
-            iArea.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
-            iArea.addEventListener('touchend', (e) => this.handleEnd(e), { passive: false });
-        }
-        window.addEventListener('resize', this.handleResize.bind(this));
-
-        // Modals
-        safeAdd('btCloseBtn', 'click', () => Utils.closeModal('btOverlay'));
-        safeAdd('closeSessionBtn', 'click', () => Utils.closeModal('sessionOverlay'));
-        safeAdd('closeMbfBtn', 'click', () => Utils.closeModal('mbfScrambleOverlay'));
-        safeAdd('closeStatsBtn', 'click', () => Utils.closeModal('statsOverlay'));
-        safeAdd('closeSettingsBtn', 'click', () => Utils.closeSettingsModal());
-        safeAdd('closeShareBtn', 'click', () => Utils.closeModal('avgShareOverlay'));
-        safeAdd('closeDetailBtn', 'click', () => Utils.closeModal('modalOverlay'));
-        safeAdd('closeUpdateLogBtn', 'click', () => Utils.closeModal('updateLogOverlay'));
-
-        // Overlay clicks
-        ['btOverlay', 'sessionOverlay', 'mbfScrambleOverlay', 'statsOverlay', 'avgShareOverlay', 'modalOverlay', 'updateLogOverlay'].forEach(id => {
-            const el = Dom.get(id);
-            if(el) el.addEventListener('click', (e) => { if(e.target === el) Utils.closeModal(id); });
-        });
-        const sOv = Dom.get('settingsOverlay');
-        if(sOv) sOv.addEventListener('click', (e) => { if(e.target === sOv) Utils.closeSettingsModal(); });
-
-        // Header
-        safeAdd('btToggleBtn', 'click', () => Utils.openModal('btOverlay'));
-        safeAdd('backupBtn', 'click', Storage.exportData);
-        safeAdd('restoreBtn', 'click', () => { const el = Dom.get('importInput'); if(el) el.click(); });
-        const imp = Dom.get('importInput');
-        if(imp) imp.addEventListener('change', (e) => Storage.importData(e.target.files[0]));
-        safeAdd('settingsBtn', 'click', () => Utils.openSettingsModal());
-        safeAdd('mobSettingsBtn', 'click', () => Utils.openSettingsModal());
-
-        // Actions
-        safeAdd('btConnectBtn', 'click', () => Bluetooth.connect());
-        safeAdd('btDisconnectBtn', 'click', () => Bluetooth.disconnect());
-        safeAdd('addSessionBtn', 'click', () => this.createNewSession());
-        safeAdd('genMbfBtn', 'click', () => this.generateMbfScrambles());
-        safeAdd('copyMbfBtn', 'click', () => Utils.copyMbfText());
-        safeAdd('copyShareBtn', 'click', () => Utils.copyShareText());
-        safeAdd('shareSingleBtn', 'click', () => Utils.openSingleShare());
-        safeAdd('useScrambleBtn', 'click', () => Utils.useThisScramble());
-        safeAdd('moreStatsBtn', 'click', () => Utils.showExtendedStats());
-        safeAdd('clearHistoryBtn', 'click', () => Utils.clearHistory());
-        safeAdd('sessionSelectBtn', 'click', () => { Utils.openModal('sessionOverlay'); this.renderSessionList(); });
-        safeAdd('plus2Btn', 'click', () => Utils.togglePenalty('+2'));
-        safeAdd('dnfBtn', 'click', () => Utils.togglePenalty('DNF'));
-
-        // Settings Inputs
-        safeAdd('darkModeToggle', 'change', (e) => Utils.toggleDarkMode(e.target));
-        safeAdd('wakeLockToggle', 'change', (e) => Utils.toggleWakeLock(e.target));
-        safeAdd('inspectionToggle', 'change', (e) => Utils.toggleInspection(e.target));
-        safeAdd('holdDurationSlider', 'input', (e) => Utils.updateHoldDuration(e.target.value));
-        safeAdd('avgModeToggle', 'change', (e) => { State.isAo5Mode = e.target.checked; this.updateHistory(); Storage.save(); });
-        safeAdd('precisionToggle', 'change', (e) => { 
-            State.precision = e.target.checked?3:2; this.updateHistory(); 
-            const t = Dom.get('timer'); if(t) t.innerText = (0).toFixed(State.precision); Storage.save(); 
-        });
-        safeAdd('manualEntryToggle', 'change', (e) => { 
-            State.isManualMode = e.target.checked; 
-            const t = Dom.get('timer'), m = Dom.get('manualInput'), s = Dom.get('statusHint');
-            if(t) t.classList.toggle('hidden', State.isManualMode);
-            if(m) m.classList.toggle('hidden', !State.isManualMode);
-            if(s) s.innerText = State.isManualMode ? "TYPE TIME & ENTER" : "HOLD TO READY";
-        });
-        safeAdd('mobBackupBtn', 'click', Storage.exportData);
-        safeAdd('mobRestoreBtn', 'click', () => { const el = Dom.get('importInput'); if(el) el.click(); });
-
-        // Delegated
-        const catTabs = Dom.get('categoryTabs');
-        if(catTabs) catTabs.addEventListener('click', (e) => {
-            const btn = e.target.closest('.category-btn'); if(btn) this.switchCategory(btn.dataset.cat);
-        });
-        document.querySelectorAll('.event-group').forEach(grp => {
-            grp.addEventListener('click', (e) => {
-                const tab = e.target.closest('.event-tab'); if(tab) this.changeEvent(tab.dataset.event);
-            });
-        });
-        const sList = Dom.get('sessionList');
-        if(sList) sList.addEventListener('click', this.handleSessionListClick.bind(this));
-        const hList = Dom.get('historyList');
-        if(hList) {
-            hList.addEventListener('click', this.handleHistoryListClick.bind(this));
-            hList.addEventListener('scroll', this.handleHistoryScroll.bind(this));
-        }
-
-        safeAdd('toolsMenuBtn', 'click', (e) => { 
-            e.stopPropagation(); const dd = Dom.get('toolsDropdown'); if(dd) dd.classList.toggle('show'); 
-        });
-        const tDD = Dom.get('toolsDropdown');
-        if(tDD) tDD.addEventListener('click', (e) => {
-            const opt = e.target.closest('.tool-option'); if(opt) this.selectTool(opt.dataset.tool);
-        });
-        window.addEventListener('click', () => { if(tDD) tDD.classList.remove('show'); });
-
-        safeAdd('mob-tab-timer', 'click', () => this.switchMobileTab('timer'));
-        safeAdd('mob-tab-history', 'click', () => this.switchMobileTab('history'));
-        safeAdd('primaryAvgBadge', 'click', () => Utils.openAvgShare('primary'));
-        safeAdd('ao12Badge', 'click', () => Utils.openAvgShare('ao12'));
-    },
-    
-    handleStart(e) {
-        if (e && e.target && (e.target.closest('.avg-badge') || e.target.closest('button') || e.target.closest('.tools-dropdown'))) return;
-        if (State.isBtConnected && !State.isInspectionMode) return;
-        if (e && e.cancelable) e.preventDefault();
-        if (State.isManualMode || State.isRunning) { if(State.isRunning) Timer.stop(); return; }
-        if (State.isInspectionMode && State.inspectionState === 'none') return;
-        
-        const tEl = Dom.get('timer');
-        const sEl = Dom.get('statusHint');
-        
-        if (State.isInspectionMode && State.inspectionState === 'inspecting') {
-            if (State.isBtConnected) return;
-            if(tEl) { tEl.style.color = '#ef4444'; tEl.classList.add('holding-status'); }
-            Timer.holdTimer = setTimeout(()=> { 
-                State.isReady=true; 
-                if(tEl) { tEl.style.color = '#10b981'; tEl.classList.replace('holding-status','ready-to-start'); }
-                if(sEl) sEl.innerText="Ready!"; 
-            }, State.holdDuration); 
-            return;
-        }
-        if(tEl) { tEl.style.color = '#ef4444'; tEl.classList.add('holding-status'); }
-        Timer.holdTimer = setTimeout(()=> { 
-            State.isReady=true; 
-            if(tEl) { tEl.style.color = '#10b981'; tEl.classList.replace('holding-status','ready-to-start'); }
-            if(sEl) sEl.innerText="Ready!"; 
-        }, State.holdDuration);
-    },
-
-    handleEnd(e) {
-        if (Date.now() - State.lastStopTimestamp < 500) return;
-        if (State.isBtConnected) {
-            if (State.isInspectionMode && State.inspectionState === 'none') Timer.startInspection();
-            return;
-        }
-        if (e && e.cancelable) e.preventDefault();
-        clearTimeout(Timer.holdTimer);
-        if (State.isManualMode) return;
-
-        if (State.isInspectionMode && !State.isRunning && State.inspectionState === 'none') {
-            Timer.startInspection(); return;
-        }
-
-        if (!State.isRunning && State.isReady) {
-            Timer.start();
-        } else {
-            const tEl = Dom.get('timer');
-            const sEl = Dom.get('statusHint');
-            if(tEl) { tEl.style.color = ''; tEl.classList.remove('holding-status','ready-to-start'); }
-            State.isReady = false;
-            if(sEl) {
-                if (!State.isInspectionMode || State.inspectionState === 'none') sEl.innerText = State.isInspectionMode ? "Start Inspection" : "Hold to Ready";
-            }
-            else if(tEl) tEl.style.color = '#ef4444';
-        }
-    },
-
-    handleKeydown(e) {
-        const mEl = Dom.get('manualInput');
-        if (State.editingSessionId || (document.activeElement && document.activeElement.tagName === 'INPUT')) {
-            if (e.code === 'Enter' && document.activeElement === mEl) { /* allowed */ } else { return; }
-        }
-        if (e.code === 'Space' && !e.repeat) { e.preventDefault(); this.handleStart(); }
-        if (State.isManualMode && e.code === 'Enter' && mEl) {
-            let v = parseFloat(mEl.value);
-            if (v > 0) Timer.stop(v * 1000);
-            mEl.value = "";
-        }
-    },
-
-    handleKeyup(e) { if(e.code==='Space' && !State.editingSessionId) this.handleEnd(); },
-
-    handleSessionListClick(e) {
-        const id = parseInt(e.target.closest('[data-session-id]')?.dataset.sessionId);
-        if (!id) return;
-        if (e.target.closest('.delete-session')) this.deleteSession(id);
-        else if (e.target.closest('.edit-session')) { State.editingSessionId = id; this.renderSessionList(); }
-        else if (e.target.closest('.save-session')) { this.saveSessionName(id); }
-        else { 
-            const eventSessions = State.sessions[State.currentEvent];
-            eventSessions.forEach(s => s.isActive = (s.id === id));
-            this.renderSessionList(); this.updateHistory(); Storage.save();
-            const tEl = Dom.get('timer');
-            if(tEl) tEl.innerText = (0).toFixed(State.precision);
-            Utils.resetPenaltyButtons();
-            Utils.closeModal('sessionOverlay');
-        }
-    },
-
-    handleHistoryListClick(e) {
-        const id = parseInt(e.target.closest('[data-solve-id]')?.dataset.solveId);
-        if (!id) return;
-        if (e.target.closest('.delete-solve')) {
-            State.solves = State.solves.filter(s => s.id !== id);
-            this.updateHistory(); Storage.save();
-        } else {
-            Utils.showSolveDetails(id);
-        }
-    },
-
-    handleHistoryScroll() {
-        const list = Dom.get('historyList');
-        if (list.scrollTop + list.clientHeight >= list.scrollHeight - 50) {
-            const sid = Storage.getCurrentSessionId();
-            const total = State.solves.filter(s => s.event === State.currentEvent && s.sessionId === sid).length;
-            if (State.displayedSolvesCount < total) {
-                State.displayedSolvesCount += State.solvesBatchSize;
-                this.updateHistory();
-            }
-        }
-    },
-
-    updateTimerDisplay(ms) { 
-        const el = Dom.get('timer');
-        if(el) el.innerText = Utils.formatTime(ms); 
-    },
-    updateInspectionDisplay(sec) {
-        const el = Dom.get('timer');
-        if(!el) return;
-        if (sec > 0) el.innerText = Math.ceil(sec);
-        else if (sec > -2) el.innerText = "+2";
-        else el.innerText = "DNF";
-    },
-    displayFinalTime(ms, penalty) {
-        const el = Dom.get('timer');
-        if(!el) return;
-        if (penalty === 'DNF') el.innerText = "DNF";
-        else {
-            let display = Utils.formatTime(ms + (penalty === '+2' ? 2000 : 0));
-            if (penalty === '+2') display += "+";
-            el.innerText = display;
-        }
-    },
-    setTimerStatus(status) {
-        const sEl = Dom.get('statusHint');
-        const tEl = Dom.get('timer');
-        const hints = {
-            'running': "Timing...",
-            'idle': State.isInspectionMode ? "Start Inspection" : "Hold to Ready",
-            'inspection': "Inspection",
-            'ready': "Ready!"
-        };
-        if(sEl) sEl.innerText = hints[status] || hints['idle'];
-        if(tEl) {
-            if(status === 'running') { tEl.classList.add('text-running'); tEl.classList.remove('text-ready'); }
-            else tEl.classList.remove('text-running', 'text-ready');
-        }
-    },
-    updateBTUI(connected) {
-        const icon = Dom.get('btStatusIcon');
-        if(icon) icon.classList.replace(connected ? 'disconnected' : 'connected', connected ? 'connected' : 'disconnected');
-        const pnl = Dom.get('btInfoPanel');
-        if(pnl) pnl.classList.toggle('hidden', !connected);
-        const dis = Dom.get('btDisconnectBtn');
-        if(dis) dis.classList.toggle('hidden', !connected);
-        const con = Dom.get('btConnectBtn');
-        if(con) con.classList.toggle('hidden', connected);
-        
-        if(connected) {
-            const nm = Dom.get('btDeviceName');
-            const st = Dom.get('btStatusText');
-            const ic = Dom.get('btModalIcon');
-            const ht = Dom.get('statusHint');
-            
-            if(nm && Bluetooth.device) nm.innerText = Bluetooth.device.name;
-            if(st) st.innerText = "Timer Connected & Ready";
-            if(ic) ic.classList.remove('bt-pulse');
-            if(ht) ht.innerText = "Timer Ready (BT)";
-        } else {
-            const st = Dom.get('btStatusText');
-            const ht = Dom.get('statusHint');
-            if(st) st.innerText = "Timer Disconnected";
-            if(ht) ht.innerText = "Hold to Ready";
-        }
-    },
-    syncSettings(settings) {
-        const get = Dom.get;
-        const pT = get('precisionToggle'); if(pT) pT.checked = (settings.precision === 3);
-        const aT = get('avgModeToggle'); if(aT) aT.checked = settings.isAo5Mode;
-        const dT = get('darkModeToggle'); if(dT) dT.checked = settings.isDarkMode;
-        const wT = get('wakeLockToggle'); if(wT) wT.checked = settings.isWakeLockEnabled;
-        const iT = get('inspectionToggle'); if(iT) iT.checked = settings.isInspectionMode;
-        
-        if (settings.isInspectionMode) Utils.toggleInspection(iT);
-        else {
-            const sl = get('holdDurationSlider');
-            const sv = get('holdDurationValue');
-            if(sl) {
-                sl.value = settings.holdDuration / 1000;
-                if(sv) sv.innerText = sl.value + "s";
-            }
-        }
-        Utils.toggleDarkMode(dT);
-    },
-    switchCategory(cat) {
-        if(State.isRunning) return;
-        document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active', 'text-white'));
-        const btn = Dom.get(`cat-${cat}`);
-        if(btn) { btn.classList.add('active', 'text-white'); btn.classList.remove('text-slate-500', 'dark:text-slate-400'); }
-        
-        document.querySelectorAll('.event-group').forEach(g => g.classList.add('hidden'));
-        const grp = Dom.get(`group-${cat}`);
-        if(grp) {
-            grp.classList.remove('hidden');
-            grp.classList.add('flex');
-            // Auto select first
-            const first = grp.querySelector('button');
-            if(first) this.changeEvent(first.dataset.event);
-        }
-    },
-    changeEvent(event) {
-        if(State.isRunning) return;
-        State.currentEvent = event;
-        Storage.initSessionIfNeeded(event);
-        State.displayedSolvesCount = State.solvesBatchSize;
-        const hist = Dom.get('historyList');
-        if(hist) hist.scrollTop = 0;
-
-        document.querySelectorAll('.event-tab').forEach(t => {
-            t.classList.remove('active', 'text-white', 'bg-blue-600');
-            t.classList.add('text-slate-500', 'dark:text-slate-400');
-        });
-        const tab = Dom.get(`tab-${event}`);
-        if(tab) { tab.classList.add('active', 'text-white', 'bg-blue-600'); tab.classList.remove('text-slate-500', 'dark:text-slate-400'); }
-
-        const conf = Config.events[event];
-        if(conf && conf.cat === 'blind') this.selectTool('graph');
-        else this.selectTool(State.activeTool === 'graph' ? 'graph' : 'scramble');
-
-        const isBig = ['666','777','333bf','444bf','555bf','333mbf'].includes(event);
-        State.isAo5Mode = !isBig; 
-        const avgToggle = Dom.get('avgModeToggle');
-        if(avgToggle) avgToggle.checked = !isBig;
-
-        const scrEl = Dom.get('scramble');
-        const mbfEl = Dom.get('mbfInputArea');
-
-        if(event === '333mbf') {
-            if(scrEl) scrEl.classList.add('hidden');
-            if(mbfEl) mbfEl.classList.remove('hidden');
-        } else {
-            if(scrEl) {
-                scrEl.classList.remove('hidden');
-                Scrambler.generate();
-            }
-            if(mbfEl) mbfEl.classList.add('hidden');
-        }
-        this.updateHistory(); 
-        const tEl = Dom.get('timer');
-        if(tEl) tEl.innerText = (0).toFixed(State.precision); 
-        Storage.save();
-    },
-    updateHistory() {
-        const sid = Storage.getCurrentSessionId();
-        let filtered = State.solves.filter(s => s.event === State.currentEvent && s.sessionId === sid);
-        
-        const activeSession = (State.sessions[State.currentEvent] || []).find(s => s.isActive);
-        const sessNameEl = Dom.get('currentSessionNameDisplay');
-        if (activeSession && sessNameEl) sessNameEl.innerText = activeSession.name;
-
-        const subset = filtered.slice(0, State.displayedSolvesCount);
-        const listEl = Dom.get('historyList');
-        if(listEl) {
-            listEl.innerHTML = subset.map(s => `
-                <div class="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-3 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm transition-all" data-solve-id="${s.id}">
-                    <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">${s.penalty==='DNF'?'DNF':Utils.formatTime(s.penalty==='+2'?s.time+2000:s.time)}${s.penalty==='+2'?'+':''}</span>
-                    <button class="delete-solve opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                    </button>
-                </div>
-            `).join('') || '<div class="text-center py-10 text-slate-300 text-[11px] italic">No solves yet</div>';
-        }
-
-        const countEl = Dom.get('solveCount');
-        if(countEl) countEl.innerText = filtered.length;
-        
-        const lp = Dom.get('labelPrimaryAvg');
-        const dp = Dom.get('displayPrimaryAvg');
-        const da = Dom.get('displayAo12');
-        
-        if(lp) lp.innerText = State.isAo5Mode ? "Ao5" : "Mo3";
-        if(dp) dp.innerText = Utils.calculateAvg(filtered, State.isAo5Mode ? 5 : 3, !State.isAo5Mode);
-        if(da) da.innerText = Utils.calculateAvg(filtered, 12);
-        
-        let valid = filtered.filter(s=>s.penalty!=='DNF').map(s=>s.penalty==='+2'?s.time+2000:s.time);
-        const sa = Dom.get('sessionAvg');
-        const bs = Dom.get('bestSolve');
-        
-        if(sa) sa.innerText = valid.length ? Utils.formatTime(valid.reduce((a,b)=>a+b,0)/valid.length) : "-";
-        if(bs) bs.innerText = valid.length ? Utils.formatTime(Math.min(...valid)) : "-";
-
-        if (State.activeTool === 'graph') this.renderGraph();
-    },
-    renderSessionList() {
-        const list = Dom.get('sessionList');
-        if(!list) return;
-        const sessions = State.sessions[State.currentEvent] || [];
-        const countEl = Dom.get('sessionCountLabel');
-        if(countEl) countEl.innerText = `${sessions.length}/10`;
-        
-        list.innerHTML = sessions.map(s => {
-            if (State.editingSessionId === s.id) {
-                return `<div class="flex items-center gap-2"><input type="text" id="editSessionInput" value="${s.name}" class="flex-1 bg-white dark:bg-slate-800 border border-blue-400 rounded-xl px-3 py-2.5 text-xs font-bold outline-none dark:text-white" autofocus><button class="save-session p-2 text-blue-600" data-session-id="${s.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button></div>`;
-            }
-            return `<div class="flex items-center gap-2 group" data-session-id="${s.id}"><div class="flex-1 flex items-center gap-2 p-1 rounded-xl border ${s.isActive ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400'} hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"><button class="flex-1 text-left p-2.5 text-xs font-bold truncate">${s.name}</button><button class="edit-session p-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-blue-500 transition-all"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></div>${sessions.length > 1 ? `<button class="delete-session p-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg></button>` : ''}</div>`;
-        }).join('');
-        
-        if (State.editingSessionId) {
-            const input = Dom.get('editSessionInput');
-            if(input) {
-                input.focus();
-                input.addEventListener('blur', () => this.saveSessionName(State.editingSessionId));
-                input.addEventListener('keydown', (e) => { if(e.key === 'Enter') this.saveSessionName(State.editingSessionId); });
-            }
-        }
-        const form = Dom.get('sessionCreateForm');
-        if(form) form.classList.toggle('hidden', sessions.length >= 10);
-    },
-    createNewSession() {
-        const input = Dom.get('newSessionName');
-        if(!input) return;
-        const name = input.value.trim() || `Session ${State.sessions[State.currentEvent].length + 1}`;
-        if (State.sessions[State.currentEvent].length >= 10) return;
-        State.sessions[State.currentEvent].forEach(s => s.isActive = false);
-        State.sessions[State.currentEvent].push({ id: Date.now(), name: name, isActive: true });
-        input.value = "";
-        this.renderSessionList(); this.updateHistory(); Storage.save();
-        const tEl = Dom.get('timer');
-        if(tEl) tEl.innerText = (0).toFixed(State.precision); 
-        Utils.resetPenaltyButtons();
-    },
-    deleteSession(id) {
-        const eventSessions = State.sessions[State.currentEvent];
-        if (!eventSessions || eventSessions.length <= 1) return;
-        const targetIdx = eventSessions.findIndex(s => s.id === id);
-        if (targetIdx === -1) return;
-        const wasActive = eventSessions[targetIdx].isActive;
-        State.sessions[State.currentEvent] = eventSessions.filter(s => s.id !== id);
-        State.solves = State.solves.filter(s => !(s.event === State.currentEvent && s.sessionId === id));
-        if (wasActive && State.sessions[State.currentEvent].length > 0) State.sessions[State.currentEvent][0].isActive = true;
-        this.renderSessionList(); this.updateHistory(); Storage.save();
-    },
-    saveSessionName(id) {
-        const input = Dom.get('editSessionInput');
-        if (!input) return;
-        const newName = input.value.trim();
-        if (newName) { const s = State.sessions[State.currentEvent].find(x => x.id === id); if (s) s.name = newName; }
-        State.editingSessionId = null;
-        this.renderSessionList(); this.updateHistory(); Storage.save();
-    },
-    selectTool(tool) {
-        State.activeTool = tool;
-        const isBlind = Config.events[State.currentEvent]?.cat === 'blind';
-        const label = Dom.get('toolLabel');
-        if(label) label.innerText = isBlind ? 'N/A (Blind)' : (tool === 'scramble' ? 'Scramble Image' : 'Graph (Trends)');
-        
-        const vWrap = Dom.get('visualizerWrapper');
-        const gWrap = Dom.get('graphWrapper');
-        if(vWrap) vWrap.classList.toggle('hidden', tool !== 'scramble');
-        if(gWrap) gWrap.classList.toggle('hidden', tool !== 'graph');
-        
-        document.querySelectorAll('.tool-option').forEach(opt => opt.classList.remove('active'));
-        const activeOpt = Dom.get(`tool-opt-${tool}`);
-        if(activeOpt) activeOpt.classList.add('active');
-        
-        const dd = Dom.get('toolsDropdown');
-        if(dd) dd.classList.remove('show');
-        
-        if (tool === 'graph') this.renderGraph(); else if (tool === 'scramble') Visualizer.draw();
-    },
-    renderGraph() {
-        const sid = Storage.getCurrentSessionId();
-        const filtered = [...State.solves].filter(s => s.event === State.currentEvent && s.sessionId === sid).reverse();
-        const polyline = Dom.get('graphLine');
-        if(!polyline) return;
-        if (filtered.length < 2) { polyline.setAttribute('points', ""); return; }
-        const validTimes = filtered.map(s => s.penalty === 'DNF' ? null : (s.penalty === '+2' ? s.time + 2000 : s.time));
-        const maxTime = Math.max(...validTimes.filter(t => t !== null));
-        const minTime = Math.min(...validTimes.filter(t => t !== null));
-        const range = maxTime - minTime || 1;
-        const points = filtered.map((s, i) => {
-            const t = s.penalty === 'DNF' ? maxTime : (s.penalty === '+2' ? s.time + 2000 : s.time);
-            const x = (i / (filtered.length - 1)) * 100;
-            const y = 90 - ((t - minTime) / range) * 80;
-            return `${x},${y}`;
-        }).join(' ');
-        polyline.setAttribute('points', points);
-    },
-    switchMobileTab(tab) {
-        const tSec = Dom.get('timerSection');
-        const hSec = Dom.get('historySection');
-        const tBtn = Dom.get('mob-tab-timer');
-        const hBtn = Dom.get('mob-tab-history');
-
-        if (tab === 'timer') {
-            if(tSec) tSec.classList.remove('hidden'); 
-            if(hSec) hSec.classList.add('hidden');
-            if(tBtn) tBtn.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
-            if(hBtn) hBtn.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
-        } else {
-            if(tSec) tSec.classList.add('hidden'); 
-            if(hSec) { hSec.classList.remove('hidden'); hSec.classList.add('flex'); }
-            if(hBtn) hBtn.className = "flex flex-col items-center justify-center w-full h-full text-blue-600 dark:text-blue-400";
-            if(tBtn) tBtn.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors";
-            if(State.activeTool === 'graph') this.renderGraph();
-        }
-    },
-    handleResize() {
-        const tSec = Dom.get('timerSection');
-        const hSec = Dom.get('historySection');
-        
-        if (window.innerWidth >= 768) {
-            if(tSec) tSec.classList.remove('hidden');
-            if(hSec) { hSec.classList.remove('hidden'); hSec.classList.add('flex'); }
-        } else {
-            const tBtn = Dom.get('mob-tab-timer');
-            if (tBtn && tBtn.classList.contains('text-blue-600')) this.switchMobileTab('timer');
-            else this.switchMobileTab('history');
-        }
-    },
-    generateMbfScrambles() {
-        const input = Dom.get('mbfCubeInput');
-        if(!input) return;
-        const count = parseInt(input.value);
-        if (!count || count < 2 || count > 100) return;
-        const list = Dom.get('mbfScrambleList');
-        if(Dom.get('mbfCubeCountDisplay')) Dom.get('mbfCubeCountDisplay').innerText = `${count} Cubes`;
-        if(list) {
-            list.innerHTML = "";
-            for (let i = 1; i <= count; i++) {
-                list.innerHTML += `
-                    <div class="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="w-6 h-6 flex items-center justify-center bg-blue-600 text-white rounded-full text-[10px] font-bold">#${i}</span>
-                            <span class="text-[10px] font-black uppercase text-slate-400">Scramble</span>
-                        </div>
-                        <p class="font-bold text-slate-600 dark:text-slate-300 leading-relaxed scramble-text">${Scrambler.generate3bldText()}</p>
-                    </div>`;
-            }
-        }
-        Utils.openModal('mbfScrambleOverlay');
-        State.currentScramble = `Multi-Blind (${count} Cubes Attempt)`;
-    }
-};
-
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     UI.init();
     Storage.load();
-    Visualizer.init(); // [FIXED] Explicit initialization call
     // [FIX] Force update on init with a tiny delay to ensure DOM is ready
     setTimeout(() => {
         UI.changeEvent(State.currentEvent || '333');
