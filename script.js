@@ -1,6 +1,8 @@
 /**
- * Cube Timer Application
- * Fixed: Robust Visualization & Simple Settings Modal
+ * Cube Timer Application - Emergency Recovery Version
+ * - Removed external 'cubing.js' dependency to prevent freezing.
+ * - Restored internal Canvas Visualizer for NxN.
+ * - Fixed Settings Modal & Initialization logic.
  */
 
 const CubeTimerApp = {
@@ -39,33 +41,34 @@ const CubeTimerApp = {
 
     // --- Configuration ---
     config: {
-        appVersion: '1.2.5',
+        appVersion: '1.3-recovery',
         updateLogs: [
-            "스크램블 이미지 로드 방식 개선 (대기열 처리)",
-            "설정 팝업 표시 오류 수정 (강제 표시)",
-            "초기화 안정성 강화"
+            "긴급 복구: 외부 라이브러리 제거 (프리징 해결)",
+            "3x3 등 기본 종목 시각화 복구",
+            "설정 팝업 정상 작동 패치"
         ],
         events: {
-            '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
-            '333oh': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
-            '222': { moves: ["U","R","F"], len: 11, cat: 'standard', puzzle: '2x2x2' },
-            '444': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, cat: 'standard', puzzle: '4x4x4' },
-            '555': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, cat: 'standard', puzzle: '5x5x5' },
-            '666': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Rw","3Fw"], len: 80, cat: 'standard', puzzle: '6x6x6' },
-            '777': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Dw","3Lw","3Rw","3Fw","3Bw"], len: 100, cat: 'standard', puzzle: '7x7x7' },
-            'minx': { moves: ["R++","R--","D++","D--"], len: 77, cat: 'nonstandard', puzzle: 'megaminx' },
-            'pyra': { moves: ["U","L","R","B"], len: 10, tips: ["u","l","r","b"], cat: 'nonstandard', puzzle: 'pyraminx' },
-            'clock': { len: 18, cat: 'nonstandard', puzzle: 'clock' },
-            'skewb': { moves: ["U","L","R","B"], len: 10, cat: 'nonstandard', puzzle: 'skewb' },
-            'sq1': { len: 12, cat: 'nonstandard', puzzle: 'square1' },
-            '333bf': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'blind', puzzle: '3x3x3' },
-            '444bf': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, cat: 'blind', puzzle: '4x4x4' },
-            '555bf': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, cat: 'blind', puzzle: '5x5x5' },
-            '333mbf': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'blind', puzzle: '3x3x3' }
+            '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', n: 3 },
+            '333oh': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', n: 3 },
+            '222': { moves: ["U","R","F"], len: 11, cat: 'standard', n: 2 },
+            '444': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, cat: 'standard', n: 4 },
+            '555': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, cat: 'standard', n: 5 },
+            '666': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Rw","3Fw"], len: 80, cat: 'standard', n: 6 },
+            '777': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw","3Uw","3Dw","3Lw","3Rw","3Fw","3Bw"], len: 100, cat: 'standard', n: 7 },
+            'minx': { moves: ["R++","R--","D++","D--"], len: 77, cat: 'nonstandard' },
+            'pyra': { moves: ["U","L","R","B"], len: 10, tips: ["u","l","r","b"], cat: 'nonstandard' },
+            'clock': { len: 18, cat: 'nonstandard' },
+            'skewb': { moves: ["U","L","R","B"], len: 10, cat: 'nonstandard' },
+            'sq1': { len: 12, cat: 'nonstandard' },
+            '333bf': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'blind', n: 3 },
+            '444bf': { moves: ["U","D","L","R","F","B","Uw","Rw","Fw"], len: 44, cat: 'blind', n: 4 },
+            '555bf': { moves: ["U","D","L","R","F","B","Uw","Dw","Lw","Rw","Fw","Bw"], len: 60, cat: 'blind', n: 5 },
+            '333mbf': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'blind', n: 3 }
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
+        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
     },
 
     dom: {},
@@ -187,14 +190,20 @@ const CubeTimerApp = {
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = scrambleStr;
                 
+                // Update Visualizer (Canvas)
+                if (conf.n) {
+                    CubeTimerApp.visualizer.init(conf.n);
+                    const moves = scrambleStr.split(/\s+/).filter(s => s && !CubeTimerApp.config.orientations.includes(s) && s !== 'y2');
+                    moves.forEach(m => CubeTimerApp.visualizer.applyMove(m));
+                    CubeTimerApp.visualizer.draw();
+                } else {
+                    CubeTimerApp.visualizer.clear();
+                }
+
                 CubeTimerApp.ui.resetPenaltyButtons();
                 if (CubeTimerApp.state.activeTool === 'graph') {
                     CubeTimerApp.ui.renderGraph();
-                } 
-                
-                // Always try to update visualizer
-                CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
-
+                }
             } catch (e) {
                 console.error("Scramble Generation Failed:", e);
                 const scrEl = document.getElementById('scramble');
@@ -202,19 +211,20 @@ const CubeTimerApp = {
             }
         },
 
+        // ... Scramble Generation Logic (Same as before, abbreviated for reliability) ...
         generateMinx(res) {
-            for (let i = 0; i < 7; i++) {
+             for (let i = 0; i < 7; i++) {
                 let line = [];
                 for (let j = 0; j < 10; j++) {
-                    const type = (j % 2 === 0) ? "R" : "D";
-                    const suffix = (Math.random() < 0.5) ? "++" : "--";
-                    line.push(type + suffix);
+                    line.push((j%2===0?"R":"D") + (Math.random()<0.5?"++":"--"));
                 }
-                line.push(Math.random() < 0.5 ? "U" : "U'");
-                res.push(line.join(" "));
+                line.push(Math.random()<0.5?"U":"U'"); res.push(line.join(" "));
             }
         },
         generateClock(res) {
+            const dials = ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"];
+            dials.forEach(d => res.push(`${d}${Math.floor(Math.random()*12)-5}${Math.floor(Math.random()*12)-5>=0?'+':''}`)); // simplified
+            res.length = 0; // Reset for proper generation
             ["UR", "DR", "DL", "UL", "U", "R", "D", "L", "ALL"].forEach(d => {
                 const v = Math.floor(Math.random() * 12) - 5;
                 res.push(`${d}${v >= 0 ? '+' : ''}${v}`);
@@ -306,61 +316,76 @@ const CubeTimerApp = {
     },
 
     visualizer: {
-        update(puzzleId, scramble) {
-            const container = document.getElementById('cubeVisualizer');
-            if(!container) return;
-            
-            const msg = document.getElementById('noVisualizerMsg');
-            if(msg) msg.classList.add('hidden');
-            container.style.display = 'flex';
-
-            if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
-               if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
-               container.style.display = 'none';
-               // Hide any existing player
-               const p = container.querySelector('twisty-player');
-               if(p) p.style.display = 'none';
-               return;
+        cubeState: {},
+        ctx: null,
+        
+        init(n) {
+            this.cubeState = { n };
+            const C = CubeTimerApp.config.cubeColors;
+            ['U','D','L','R','F','B'].forEach(f => this.cubeState[f] = Array(n*n).fill(C[f]));
+            const canvas = document.getElementById('cubeVisualizer');
+            if(canvas) {
+                this.ctx = canvas.getContext('2d');
+                canvas.style.display = 'block'; // Ensure visible
+                const msg = document.getElementById('noVisualizerMsg');
+                if(msg) msg.classList.add('hidden');
             }
-
-            // [CRITICAL FIX] Wait for library to be ready using standard API
-            if (customElements.get('twisty-player')) {
-                let player = container.querySelector('twisty-player');
-                if (!player) {
-                    player = document.createElement('twisty-player');
-                    player.setAttribute('visualization', '2D');
-                    player.setAttribute('background', 'none');
-                    player.setAttribute('control-panel', 'none');
-                    player.style.pointerEvents = "none"; 
-                    container.appendChild(player);
+        },
+        clear() {
+            const canvas = document.getElementById('cubeVisualizer');
+            const msg = document.getElementById('noVisualizerMsg');
+            if(canvas) canvas.style.display = 'none';
+            if(msg) {
+                msg.classList.remove('hidden');
+                if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
+                    msg.innerText = "Scramble images disabled for Blind";
+                } else {
+                    msg.innerText = "Visualizer for standard cubes only";
                 }
-                player.style.display = 'block';
-                player.setAttribute('puzzle', puzzleId);
-                player.setAttribute('alg', scramble);
-            } else {
-                // If not ready, try again in 300ms
-                setTimeout(() => this.update(puzzleId, scramble), 300);
+            }
+        },
+        rotateFace(fName) {
+            const n = this.cubeState.n, f = this.cubeState[fName], next = Array(n*n);
+            for(let r=0;r<n;r++) for(let c=0;c<n;c++) next[c*n+(n-1-r)] = f[r*n+c];
+            this.cubeState[fName] = next;
+        },
+        applyMove(move) {
+            const n = this.cubeState.n; if(!n) return;
+            let base = move[0], layer = 1;
+            if(move.includes('w')) { if(/^\d/.test(move)) { layer = parseInt(move[0]); base = move[1]; } else { layer = 2; base = move[0]; } }
+            const reps = move.includes("'") ? 3 : (move.includes("2") ? 2 : 1);
+            
+            for(let r=0; r<reps; r++) {
+                for(let l=1; l<=layer; l++) {
+                    if(l===1) this.rotateFace(base);
+                    const d = l-1, last = n-1-d, S = this.cubeState;
+                    if(base==='U') for(let i=0;i<n;i++) { let t=S.F[d*n+i]; S.F[d*n+i]=S.R[d*n+i]; S.R[d*n+i]=S.B[d*n+i]; S.B[d*n+i]=S.L[d*n+i]; S.L[d*n+i]=t; }
+                    else if(base==='D') for(let i=0;i<n;i++) { let t=S.F[last*n+i]; S.F[last*n+i]=S.L[last*n+i]; S.L[last*n+i]=S.B[last*n+i]; S.B[last*n+i]=S.R[last*n+i]; S.R[last*n+i]=t; }
+                    else if(base==='L') for(let i=0;i<n;i++) { let t=S.F[i*n+d]; S.F[i*n+d]=S.U[i*n+d]; S.U[i*n+d]=S.B[(n-1-i)*n+(n-1-d)]; S.B[(n-1-i)*n+(n-1-d)]=S.D[i*n+d]; S.D[i*n+d]=t; }
+                    else if(base==='R') for(let i=0;i<n;i++) { let t=S.F[i*n+last]; S.F[i*n+last]=S.D[i*n+last]; S.D[i*n+last]=S.B[(n-1-i)*n+d]; S.B[(n-1-i)*n+d]=S.U[i*n+last]; S.U[i*n+last]=t; }
+                    else if(base==='F') for(let i=0;i<n;i++) { let t=S.U[last*n+i]; S.U[last*n+i]=S.L[(n-1-i)*n+last]; S.L[(n-1-i)*n+last]=S.D[d*n+(n-1-i)]; S.D[d*n+(n-1-i)]=S.R[i*n+d]; S.R[i*n+d]=t; }
+                    else if(base==='B') for(let i=0;i<n;i++) { let t=S.U[d*n+i]; S.U[d*n+i]=S.R[i*n+last]; S.R[i*n+last]=S.D[last*n+(n-1-i)]; S.D[last*n+(n-1-i)]=S.L[(n-1-i)*n+d]; S.L[(n-1-i)*n+d]=t; }
+                }
             }
         },
         draw() {
-            const event = CubeTimerApp.state.currentEvent;
-            const conf = CubeTimerApp.config.events[event];
-            const scramble = CubeTimerApp.state.currentScramble;
-            if (conf && scramble) {
-                this.update(conf.puzzle, scramble);
-            }
-        },
-        clear() { 
-            const container = document.getElementById('cubeVisualizer');
-            if(container) {
-                const p = container.querySelector('twisty-player');
-                if(p) p.style.display = 'none';
-            }
+            if(!this.ctx || !this.cubeState.n) return;
+            const n = this.cubeState.n;
+            const ctx = this.ctx, faceS = 55, tileS = faceS/n, gap = 4;
+            ctx.clearRect(0,0,260,190);
+            const offX = (260-(4*faceS+3*gap))/2, offY = (190-(3*faceS+2*gap))/2;
+            const drawF = (f,x,y) => this.cubeState[f].forEach((c,i) => {
+                ctx.fillStyle=c; ctx.fillRect(x+(i%n)*tileS, y+Math.floor(i/n)*tileS, tileS, tileS);
+                ctx.strokeStyle='#1e293b'; ctx.lineWidth=n>5?0.2:0.5; ctx.strokeRect(x+(i%n)*tileS, y+Math.floor(i/n)*tileS, tileS, tileS);
+            });
+            drawF('U', offX+faceS+gap, offY); drawF('L', offX, offY+faceS+gap); drawF('F', offX+faceS+gap, offY+faceS+gap);
+            drawF('R', offX+2*(faceS+gap), offY+faceS+gap); drawF('B', offX+3*(faceS+gap), offY+faceS+gap); drawF('D', offX+faceS+gap, offY+2*(faceS+gap));
         }
     },
 
     ui: {
         init() {
+            // Map IDs to DOM Object
             const ids = [
                 'timer', 'scramble', 'mbfInputArea', 'mbfCubeInput', 'manualInput', 'historyList',
                 'solveCount', 'sessionAvg', 'bestSolve', 'labelPrimaryAvg', 'displayPrimaryAvg', 'displayAo12',
@@ -407,13 +432,7 @@ const CubeTimerApp = {
             this.bindModal('sessionOverlay', 'closeSessionBtn');
             this.bindModal('mbfScrambleOverlay', 'closeMbfBtn');
             this.bindModal('statsOverlay', 'closeStatsBtn');
-            
-            // [FIX] Simple Settings Modal Logic (Force show)
-            safeAdd('settingsOverlay', 'click', (e) => { 
-                if(e.target.id === 'settingsOverlay') U.closeSettingsModal(); 
-            });
-            safeAdd('closeSettingsBtn', 'click', () => U.closeSettingsModal());
-
+            this.bindModal('settingsOverlay', 'closeSettingsBtn');
             this.bindModal('avgShareOverlay', 'closeShareBtn');
             this.bindModal('modalOverlay', 'closeDetailBtn');
             this.bindModal('updateLogOverlay', 'closeUpdateLogBtn');
@@ -424,8 +443,8 @@ const CubeTimerApp = {
             const imp = document.getElementById('importInput');
             if(imp) imp.addEventListener('change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
             
-            safeAdd('settingsBtn', 'click', () => U.openSettingsModal());
-            safeAdd('mobSettingsBtn', 'click', () => U.openSettingsModal());
+            safeAdd('settingsBtn', 'click', () => U.openModal('settingsOverlay'));
+            safeAdd('mobSettingsBtn', 'click', () => U.openModal('settingsOverlay'));
 
             safeAdd('btConnectBtn', 'click', () => CubeTimerApp.bluetooth.connect());
             safeAdd('btDisconnectBtn', 'click', () => CubeTimerApp.bluetooth.disconnect());
@@ -980,7 +999,7 @@ const CubeTimerApp = {
             const el = document.getElementById(id); 
             if(el) { 
                 el.classList.add('active'); 
-                // Removed complex animation logic for settings to ensure it shows
+                el.classList.add('force-show');
                 if(id === 'sessionOverlay') CubeTimerApp.ui.renderSessionList(); 
             }
         },
@@ -989,32 +1008,11 @@ const CubeTimerApp = {
             const el = document.getElementById(id);
             if(el) {
                 el.classList.remove('active');
+                el.classList.remove('force-show');
             }
         },
-        openSettingsModal() { 
-            const el = document.getElementById('settingsOverlay');
-            if(el) {
-                el.classList.add('active');
-                // Force visible style directly if classes fail
-                const content = document.getElementById('settingsModal');
-                if(content) {
-                    content.classList.remove('scale-95', 'opacity-0');
-                }
-            }
-        },
-        closeSettingsModal() { 
-            const el = document.getElementById('settingsOverlay');
-            if(el) {
-                const content = document.getElementById('settingsModal');
-                if(content) {
-                    content.classList.add('scale-95', 'opacity-0');
-                    setTimeout(() => el.classList.remove('active'), 200);
-                } else {
-                    el.classList.remove('active');
-                }
-            }
-            CubeTimerApp.storage.save(); 
-        },
+        openSettingsModal() { this.openModal('settingsOverlay'); },
+        closeSettingsModal() { this.closeModal('settingsOverlay'); CubeTimerApp.storage.save(); },
         checkUpdateLog() {
             const saved = localStorage.getItem('appVersion');
             if (saved !== CubeTimerApp.config.appVersion) {
