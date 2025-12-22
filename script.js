@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Visualizer Updated: Fixed rendering crash by forcing re-creation of player
+ * Visualizer Updated: Single Instance Pattern enforced to prevent rendering crashes.
  */
 
 // 1. App State
@@ -39,10 +39,11 @@ const State = {
 
 // 2. Configuration
 const Config = {
-    appVersion: '1.4.4',
+    appVersion: '1.4.5',
     updateLogs: [
-        "스크램블 이미지 렌더링 오류 수정",
-        "퍼즐 전환 시 안정성 강화"
+        "TwistyPlayer 단일 인스턴스 구조 적용",
+        "종목 전환 시 렌더링 충돌(Bad position) 해결",
+        "Blind 모드 시각화 숨김 처리 개선"
     ],
     events: {
         '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -570,53 +571,82 @@ const Storage = {
     }
 };
 
-// 8. Visualizer Module (FIXED: Re-create player to prevent renderer crashes)
+// 8. Visualizer Module (FIXED: STRICT SINGLE INSTANCE PATTERN)
 const Visualizer = {
+    player: null, // Holds the single instance
+
+    init() {
+        const container = Dom.get('cubeVisualizer');
+        if (!container) return;
+
+        // Try to create the player if library is ready
+        if (window.TwistyPlayer && !this.player) {
+            try {
+                this.player = new window.TwistyPlayer({
+                    visualization: '2D',
+                    background: 'none',
+                    controlPanel: 'none'
+                });
+                
+                // Style settings
+                this.player.style.width = "100%";
+                this.player.style.height = "100%";
+                this.player.style.pointerEvents = "none";
+                
+                container.appendChild(this.player);
+                console.log("Visualizer Initialized");
+            } catch (e) {
+                console.error("Visualizer Init Failed:", e);
+            }
+        } else if (!window.TwistyPlayer) {
+            // Retry init if library not loaded yet
+            setTimeout(() => this.init(), 500);
+        }
+    },
+
     update(puzzleId, scramble) {
         const container = Dom.get('cubeVisualizer');
-        if(!container) return;
-        
-        // Handle Blind events (hide visualizer)
         const msg = Dom.get('noVisualizerMsg');
-        if(Config.events[State.currentEvent]?.cat === 'blind') {
-           if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
-           container.style.display = 'none';
-           return;
-        }
-
-        if(msg) msg.classList.add('hidden');
-        container.style.display = 'flex';
-
-        // Wait for library
-        if (!window.TwistyPlayer) {
-            console.log("TwistyPlayer not loaded yet, retrying in 500ms...");
-            setTimeout(() => this.update(puzzleId, scramble), 500);
+        
+        // 1. Handle Blind Events (Hide only, do not remove)
+        if (Config.events[State.currentEvent]?.cat === 'blind') {
+            if (msg) {
+                msg.classList.remove('hidden');
+                msg.innerText = "Scramble images disabled for Blind";
+            }
+            if (container) container.style.display = 'none';
             return;
         }
 
-        // [핵심 수정] 기존 플레이어를 재사용하지 않고 항상 새로 생성하여
-        // "Bad position" 및 "TypeError: children undefined" 오류 방지
-        container.innerHTML = ''; 
+        // 2. Show container
+        if (msg) msg.classList.add('hidden');
+        if (container) container.style.display = 'flex';
 
-        try {
-            const player = new window.TwistyPlayer({
-                puzzle: puzzleId,
-                alg: scramble,
-                visualization: '2D',
-                background: 'none',
-                controlPanel: 'none'
-            });
+        // 3. Ensure Player Exists
+        if (!this.player) {
+            this.init();
+            return; // Will retry in init()
+        }
+
+        // 4. Safe Update Logic
+        // If changing puzzle type, we must clear alg first to avoid "Bad position" crashes
+        // caused by applying an alg of Puzzle A to Geometry of Puzzle B.
+        if (this.player.puzzle !== puzzleId) {
+            this.player.alg = ''; // Clear alg first
             
-            // 스타일 적용
-            player.style.width = "100%";
-            player.style.height = "100%";
-            player.style.pointerEvents = "none"; // 터치/드래그 간섭 방지
-            
-            container.appendChild(player);
-        } catch(e) {
-            console.error("TwistyPlayer init failed:", e);
+            // Use timeout to let the internal engine clear the state
+            setTimeout(() => {
+                if (this.player) {
+                    this.player.puzzle = puzzleId;
+                    this.player.alg = scramble;
+                }
+            }, 50); 
+        } else {
+            // Same puzzle, just update alg
+            this.player.alg = scramble;
         }
     },
+
     draw() {
         const event = State.currentEvent;
         const conf = Config.events[event];
@@ -1270,6 +1300,7 @@ const UI = {
 document.addEventListener('DOMContentLoaded', () => {
     UI.init();
     Storage.load();
+    Visualizer.init(); // [FIXED] Explicit initialization call
     // [FIX] Force update on init with a tiny delay to ensure DOM is ready
     setTimeout(() => {
         UI.changeEvent(State.currentEvent || '333');
