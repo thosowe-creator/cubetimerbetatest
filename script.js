@@ -1,9 +1,10 @@
 /**
  * Cube Timer Application
- * Fixed: Visualizer draw logic, Scramble image persistence
+ * Fixed: Visualizer logic (Reuse existing player instead of recreating)
  */
 
 const CubeTimerApp = {
+    // --- State Management ---
     state: {
         solves: [],
         sessions: {},
@@ -36,12 +37,13 @@ const CubeTimerApp = {
         isBtConnected: false
     },
 
+    // --- Configuration ---
     config: {
-        appVersion: '1.2.1',
+        appVersion: '1.2.2',
         updateLogs: [
-            "스크램블 이미지 미표시 버그 수정",
-            "시각화 도구 전환 로직 개선",
-            "Etc. 종목 지원 강화"
+            "스크램블 이미지 렌더링 방식 최적화 (깜빡임 해결)",
+            "Etc. 종목 시각화 지원",
+            "설정 팝업 및 초기화 버그 수정"
         ],
         events: {
             '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -63,7 +65,8 @@ const CubeTimerApp = {
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
+        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
     },
 
     dom: {},
@@ -184,12 +187,11 @@ const CubeTimerApp = {
                 const scrambleStr = res.join(event === 'minx' ? "\n" : " ");
                 CubeTimerApp.state.currentScramble = scrambleStr;
 
-                // Update Text UI
+                // Update Text UI FIRST
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = scrambleStr;
                 
-                // [FIX] Update Visualizer ALWAYS (even if tool is graph)
-                // This ensures the player is ready when user switches tool
+                // Update Visualizer
                 try {
                     CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
                 } catch(err) {
@@ -502,25 +504,28 @@ const CubeTimerApp = {
             if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
                if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
                container.style.display = 'none';
+               // Clear player if exists to stop rendering
+               container.innerHTML = '';
                return;
             }
 
-            // [FIX] Reuse existing player to prevent flickering/re-creation overhead
+            // [FIXED] Reuse existing player to prevent flickering and overhead
+            // Do NOT use innerHTML = '' here
             let player = container.querySelector('twisty-player');
             if (!player) {
+                // Only create if it doesn't exist
                 player = document.createElement('twisty-player');
                 player.setAttribute('visualization', '2D');
                 player.setAttribute('background', 'none');
                 player.setAttribute('control-panel', 'none');
-                player.style.pointerEvents = "none"; // Disable interaction
+                player.style.pointerEvents = "none"; 
                 container.appendChild(player);
             }
             
-            // Update attributes
+            // Update attributes on existing or new player
             player.setAttribute('puzzle', puzzleId);
             player.setAttribute('alg', scramble);
         },
-        // [FIX] Implemented draw function to allow tool switching updates
         draw() {
             const event = CubeTimerApp.state.currentEvent;
             const conf = CubeTimerApp.config.events[event];
@@ -938,13 +943,14 @@ const CubeTimerApp = {
             const scrEl = document.getElementById('scramble');
             const mbfEl = document.getElementById('mbfInputArea');
 
+            // Force visibility toggle directly to ensure init
             if(event === '333mbf') {
                 if(scrEl) scrEl.classList.add('hidden');
                 if(mbfEl) mbfEl.classList.remove('hidden');
             } else {
                 if(scrEl) {
                     scrEl.classList.remove('hidden');
-                    CubeTimerApp.scrambler.generate();
+                    CubeTimerApp.scrambler.generate(); // Force generation
                 }
                 if(mbfEl) mbfEl.classList.add('hidden');
             }
