@@ -906,13 +906,14 @@ const CubeTimerApp = {
             const scrEl = document.getElementById('scramble');
             const mbfEl = document.getElementById('mbfInputArea');
 
+            // Force visibility toggle directly to ensure init
             if(event === '333mbf') {
                 if(scrEl) scrEl.classList.add('hidden');
                 if(mbfEl) mbfEl.classList.remove('hidden');
             } else {
                 if(scrEl) {
                     scrEl.classList.remove('hidden');
-                    CubeTimerApp.scrambler.generate();
+                    CubeTimerApp.scrambler.generate(); // Force generation
                 }
                 if(mbfEl) mbfEl.classList.add('hidden');
             }
@@ -1119,18 +1120,21 @@ const CubeTimerApp = {
                 window.speechSynthesis.speak(utterance);
             }
         },
+        // [FIX] Open Modal handles specific Settings animation with delay
         openModal(id) { 
             const el = document.getElementById(id); 
             if(el) { 
                 el.classList.add('active'); 
                 if(id === 'settingsOverlay') {
                     const content = document.getElementById('settingsModal');
-                    void content.offsetWidth; // Force Reflow
+                    // Force reflow
+                    void content.offsetWidth;
                     if(content) setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 50);
                 }
                 if(id === 'sessionOverlay') CubeTimerApp.ui.renderSessionList(); 
             }
         },
+        // [FIX] Specific Settings Close Animation
         closeModal(id) { 
             const el = document.getElementById(id);
             if(el) {
