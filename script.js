@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Fixed: Missing Utils functions (Clear, Share, Stats)
+ * Visualizer Updated to match Test Tool logic
  */
 
 // 1. App State
@@ -39,11 +39,11 @@ const State = {
 
 // 2. Configuration
 const Config = {
-    appVersion: '1.4.1',
+    appVersion: '1.4.2',
     updateLogs: [
-        "히스토리, 통계, 공유 기능 복구",
-        "스크립트 함수 연결 오류 수정",
-        "전체 기능 정상화"
+        "스크램블 이미지 엔진 교체",
+        "TwistyPlayer 직접 제어 방식 적용",
+        "다양한 퍼즐 시각화 안정성 향상"
     ],
     events: {
         '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -196,7 +196,6 @@ const Utils = {
         try { document.execCommand('copy'); if(btnElement) { const original = btnElement.innerText; btnElement.innerText = "Copied!"; setTimeout(() => btnElement.innerText = original, 2000); } } catch(e){}
         document.body.removeChild(ta);
     },
-    // [FIX] Added missing functions to Utils
     openAvgShare(type) {
         const sid = Storage.getCurrentSessionId();
         const count = (type === 'primary') ? (State.isAo5Mode ? 5 : 3) : 12;
@@ -572,42 +571,48 @@ const Storage = {
     }
 };
 
-// 8. Visualizer Module
+// 8. Visualizer Module (Updated with Test Tool logic)
 const Visualizer = {
     update(puzzleId, scramble) {
         const container = Dom.get('cubeVisualizer');
         if(!container) return;
         
+        // Handle Blind events (Keep existing logic: hide visualizer)
         const msg = Dom.get('noVisualizerMsg');
-        if(msg) msg.classList.add('hidden');
-        container.style.display = 'flex';
-
         if(Config.events[State.currentEvent]?.cat === 'blind') {
            if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
            container.style.display = 'none';
-           const p = container.querySelector('twisty-player');
-           if(p) p.style.display = 'none';
            return;
         }
 
-        if (!customElements.get('twisty-player')) {
-            setTimeout(() => this.update(puzzleId, scramble), 500);
-            return;
-        }
+        if(msg) msg.classList.add('hidden');
+        container.style.display = 'flex';
+
+        // Check if library is loaded (exposed in index.html)
+        if (!window.TwistyPlayer) return;
 
         let player = container.querySelector('twisty-player');
         if (!player) {
-            player = document.createElement('twisty-player');
-            player.setAttribute('visualization', '2D');
-            player.setAttribute('background', 'none');
-            player.setAttribute('control-panel', 'none');
-            player.style.pointerEvents = "none"; 
+            // Test Tool Logic: Use constructor
+            player = new window.TwistyPlayer({
+                puzzle: puzzleId,
+                alg: scramble,
+                visualization: '2D',
+                background: 'none',
+                controlPanel: 'none'
+            });
+            
+            // Apply styles
+            player.style.width = "100%";
+            player.style.height = "100%";
+            player.style.pointerEvents = "none"; // Prevent interaction stealing focus
+            
             container.appendChild(player);
+        } else {
+            // Test Tool Logic: Update properties directly
+            player.puzzle = puzzleId;
+            player.alg = scramble;
         }
-        
-        player.style.display = 'block';
-        player.setAttribute('puzzle', puzzleId);
-        player.setAttribute('alg', scramble);
     },
     draw() {
         const event = State.currentEvent;
