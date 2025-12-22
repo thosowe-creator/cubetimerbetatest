@@ -1,6 +1,7 @@
 /**
  * Cube Timer Application
- * Visualizer Updated: Single Instance Pattern enforced to prevent rendering crashes.
+ * Visualizer Updated: STRICT Single Instance Pattern with Safe Lifecycle Management
+ * Fixed: 'Bad position' & 'undefined children' errors by externalizing state.
  */
 
 // 1. App State
@@ -34,16 +35,18 @@ const State = {
     displayedSolvesCount: 50,
     solvesBatchSize: 50,
     lastBtState: null,
-    isBtConnected: false
+    isBtConnected: false,
+
+    // [NEW] Visualizer Source of Truth
+    visualizerPuzzleId: null 
 };
 
 // 2. Configuration
 const Config = {
-    appVersion: '1.4.5',
+    appVersion: '1.4.6',
     updateLogs: [
-        "TwistyPlayer 단일 인스턴스 구조 적용",
-        "종목 전환 시 렌더링 충돌(Bad position) 해결",
-        "Blind 모드 시각화 숨김 처리 개선"
+        "Visualizer 렌더링 충돌 완벽 수정",
+        "TwistyPlayer 생명주기 관리 최적화"
     ],
     events: {
         '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -571,18 +574,19 @@ const Storage = {
     }
 };
 
-// 8. Visualizer Module (FIXED: STRICT SINGLE INSTANCE PATTERN)
+// 8. Visualizer Module
 const Visualizer = {
-    player: null, // Holds the single instance
+    player: null,
 
     init() {
         const container = Dom.get('cubeVisualizer');
         if (!container) return;
 
-        // Try to create the player if library is ready
+        // Try to create the player if library is ready and not already created
         if (window.TwistyPlayer && !this.player) {
             try {
                 this.player = new window.TwistyPlayer({
+                    puzzle: "3x3x3",
                     visualization: '2D',
                     background: 'none',
                     controlPanel: 'none'
@@ -594,7 +598,7 @@ const Visualizer = {
                 this.player.style.pointerEvents = "none";
                 
                 container.appendChild(this.player);
-                console.log("Visualizer Initialized");
+                State.visualizerPuzzleId = "3x3x3";
             } catch (e) {
                 console.error("Visualizer Init Failed:", e);
             }
@@ -604,46 +608,59 @@ const Visualizer = {
         }
     },
 
+    setPuzzle(newPuzzle) {
+        if (!this.player) return;
+        
+        // 1. Clear alg first
+        this.player.alg = "";
+        
+        // 2. Change puzzle in next frame
+        requestAnimationFrame(() => {
+            this.player.puzzle = newPuzzle;
+        });
+    },
+
     update(puzzleId, scramble) {
         const container = Dom.get('cubeVisualizer');
         const msg = Dom.get('noVisualizerMsg');
+        const isBlind = Config.events[State.currentEvent]?.cat === 'blind';
         
-        // 1. Handle Blind Events (Hide only, do not remove)
-        if (Config.events[State.currentEvent]?.cat === 'blind') {
+        // Handle Blind Events
+        if (isBlind) {
             if (msg) {
                 msg.classList.remove('hidden');
                 msg.innerText = "Scramble images disabled for Blind";
             }
-            if (container) container.style.display = 'none';
+            if (this.player) this.player.style.display = 'none';
             return;
         }
 
-        // 2. Show container
+        // Show player
         if (msg) msg.classList.add('hidden');
-        if (container) container.style.display = 'flex';
+        if (this.player) this.player.style.display = 'block';
 
-        // 3. Ensure Player Exists
+        // Ensure Player Exists
         if (!this.player) {
             this.init();
             return; // Will retry in init()
         }
 
-        // 4. Safe Update Logic
-        // If changing puzzle type, we must clear alg first to avoid "Bad position" crashes
-        // caused by applying an alg of Puzzle A to Geometry of Puzzle B.
-        if (this.player.puzzle !== puzzleId) {
-            this.player.alg = ''; // Clear alg first
-            
-            // Use timeout to let the internal engine clear the state
-            setTimeout(() => {
-                if (this.player) {
-                    this.player.puzzle = puzzleId;
-                    this.player.alg = scramble;
-                }
-            }, 50); 
+        // Safe Update Logic
+        if (State.visualizerPuzzleId !== puzzleId) {
+            State.visualizerPuzzleId = puzzleId;
+            this.setPuzzle(puzzleId);
+            // Defer alg setting to ensure puzzle has changed
+            if (scramble) {
+                setTimeout(() => {
+                    if (this.player && State.visualizerPuzzleId === puzzleId) {
+                        this.player.alg = scramble;
+                    }
+                }, 50); // Slight delay to ensure rAF has fired
+            }
         } else {
-            // Same puzzle, just update alg
-            this.player.alg = scramble;
+            if (scramble) {
+                this.player.alg = scramble;
+            }
         }
     },
 
