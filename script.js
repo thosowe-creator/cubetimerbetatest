@@ -1,9 +1,10 @@
 /**
  * Cube Timer Application
- * Refactored for maintainability and modularity with Defensive Code.
+ * Fixed: Settings modal animation, Initial render issues
  */
 
 const CubeTimerApp = {
+    // --- State Management ---
     state: {
         solves: [],
         sessions: {},
@@ -36,12 +37,13 @@ const CubeTimerApp = {
         isBtConnected: false
     },
 
+    // --- Configuration ---
     config: {
-        appVersion: '1.1',
+        appVersion: '1.2',
         updateLogs: [
-            "모바일 UI 개편",
-            "Gan Halo Timer 사용 시 소숫점이 반올림되던 현상 수정",
-            "인스펙션 기능 추가",
+            "설정 팝업 버그 수정",
+            "초기 로딩 시 스크램블 미표시 현상 수정",
+            "모바일 UI 개편 및 안정성 강화"
         ],
         events: {
             '333': { moves: ["U","D","L","R","F","B"], len: 21, n: 3, cat: 'standard' },
@@ -67,8 +69,11 @@ const CubeTimerApp = {
         cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
     },
 
+    // --- DOM Cache (Populated on init) ---
     dom: {},
 
+    // --- Core Modules ---
+    
     timer: {
         interval: null,
         holdTimer: null,
@@ -148,8 +153,8 @@ const CubeTimerApp = {
         stopInspection() {
             if(this.inspectionInterval) clearInterval(this.inspectionInterval);
             CubeTimerApp.state.inspectionState = 'none';
-            const timerEl = document.getElementById('timer');
-            if(timerEl) timerEl.style.color = '';
+            const tEl = document.getElementById('timer');
+            if(tEl) tEl.style.color = '';
             
             if (CubeTimerApp.state.isInspectionMode && CubeTimerApp.state.inspectionStartTime > 0) {
                 const elapsed = (Date.now() - CubeTimerApp.state.inspectionStartTime) / 1000;
@@ -175,9 +180,10 @@ const CubeTimerApp = {
             else this.generateNxN(res, conf, event);
 
             CubeTimerApp.state.currentScramble = res.join(event === 'minx' ? "\n" : " ");
-            const scrambleEl = document.getElementById('scramble');
-            if(scrambleEl) scrambleEl.innerText = CubeTimerApp.state.currentScramble;
+            const scrEl = document.getElementById('scramble');
+            if(scrEl) scrEl.innerText = CubeTimerApp.state.currentScramble;
             
+            // Visualizer
             if (conf.n) { 
                 CubeTimerApp.visualizer.init(conf.n);
                 const moves = CubeTimerApp.state.currentScramble.split(/\s+/).filter(s => s && !CubeTimerApp.config.orientations.includes(s) && s!=='y2');
@@ -380,18 +386,19 @@ const CubeTimerApp = {
         characteristic: null,
         
         async connect() {
-            const statusText = document.getElementById('btStatusText');
+            const els = CubeTimerApp.dom;
             if (!navigator.bluetooth) {
-                if(statusText) {
-                    statusText.innerText = "Web Bluetooth is not supported.";
-                    statusText.classList.add('text-red-400');
-                }
+                const st = document.getElementById('btStatusText');
+                if(st) { st.innerText = "Web Bluetooth is not supported."; st.classList.add('text-red-400'); }
                 return;
             }
             try {
                 const btn = document.getElementById('btConnectBtn');
                 if(btn) { btn.disabled = true; btn.innerText = "Searching..."; }
-                if(statusText) statusText.innerText = "Select your GAN Timer in the popup";
+                
+                const st = document.getElementById('btStatusText');
+                if(st) st.innerText = "Select your GAN Timer in the popup";
+                
                 const icon = document.getElementById('btModalIcon');
                 if(icon) icon.classList.add('bt-pulse');
 
@@ -413,9 +420,12 @@ const CubeTimerApp = {
 
             } catch (error) {
                 console.error("BT Error:", error);
-                if(statusText) statusText.innerText = "Connection failed";
+                const st = document.getElementById('btStatusText');
+                if(st) st.innerText = "Connection failed";
+                
                 const btn = document.getElementById('btConnectBtn');
                 if(btn) { btn.disabled = false; btn.innerText = "Connect Timer"; }
+                
                 const icon = document.getElementById('btModalIcon');
                 if(icon) icon.classList.remove('bt-pulse');
             }
@@ -428,8 +438,8 @@ const CubeTimerApp = {
 
             if (stateCode !== 3 && !S.isRunning && data.byteLength >= 8) {
                 const min = data.getUint8(4), sec = data.getUint8(5), msec = data.getUint16(6, true);
-                const timerEl = document.getElementById('timer');
-                if(timerEl) timerEl.innerText = CubeTimerApp.utils.formatTime((min*60000)+(sec*1000)+msec);
+                const tEl = document.getElementById('timer');
+                if(tEl) tEl.innerText = CubeTimerApp.utils.formatTime((min*60000)+(sec*1000)+msec);
             }
 
             if (stateCode !== S.lastBtState) {
@@ -453,8 +463,8 @@ const CubeTimerApp = {
                         if (data.byteLength >= 8) {
                             const min = data.getUint8(4), sec = data.getUint8(5), msec = data.getUint16(6, true);
                             const finalMs = (min*60000)+(sec*1000)+msec;
-                            const timerEl = document.getElementById('timer');
-                            if(timerEl) timerEl.innerText = CubeTimerApp.utils.formatTime(finalMs);
+                            const tEl = document.getElementById('timer');
+                            if(tEl) tEl.innerText = CubeTimerApp.utils.formatTime(finalMs);
                             T.stop(finalMs);
                         }
                     }
@@ -479,14 +489,14 @@ const CubeTimerApp = {
             this.cubeState = { n };
             const C = CubeTimerApp.config.cubeColors;
             ['U','D','L','R','F','B'].forEach(f => this.cubeState[f] = Array(n*n).fill(C[f]));
-            const canvas = document.getElementById('cubeVisualizer');
-            if(canvas) this.ctx = canvas.getContext('2d');
+            const cvs = document.getElementById('cubeVisualizer');
+            if(cvs) this.ctx = cvs.getContext('2d');
         },
         clear() {
-            const canvas = document.getElementById('cubeVisualizer');
+            const cvs = document.getElementById('cubeVisualizer');
             const msg = document.getElementById('noVisualizerMsg');
-            if(!canvas) return;
-            canvas.style.display = 'none';
+            if(!cvs) return;
+            cvs.style.display = 'none';
             if(msg) {
                 msg.classList.remove('hidden');
                 if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
@@ -523,9 +533,9 @@ const CubeTimerApp = {
         draw() {
             if(!this.ctx) return;
             const n = this.cubeState.n;
-            const canvas = document.getElementById('cubeVisualizer');
+            const cvs = document.getElementById('cubeVisualizer');
             const msg = document.getElementById('noVisualizerMsg');
-            if(canvas) canvas.style.display = 'block';
+            if(cvs) cvs.style.display = 'block';
             if(msg) msg.classList.add('hidden');
             const ctx = this.ctx, faceS = 55, tileS = faceS/n, gap = 4;
             ctx.clearRect(0,0,260,190);
@@ -547,18 +557,17 @@ const CubeTimerApp = {
 
         setupEventListeners() {
             const U = CubeTimerApp.utils;
-            // Safer element lookup helper
-            const add = (id, evt, handler) => {
+            const safeAdd = (id, evt, handler) => {
                 const el = document.getElementById(id);
                 if(el) el.addEventListener(evt, handler);
             };
 
             window.addEventListener('keydown', this.handleKeydown.bind(this));
             window.addEventListener('keyup', this.handleKeyup.bind(this));
-            const interactiveArea = document.getElementById('timerInteractiveArea');
-            if(interactiveArea) {
-                interactiveArea.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
-                interactiveArea.addEventListener('touchend', (e) => this.handleEnd(e), { passive: false });
+            const iArea = document.getElementById('timerInteractiveArea');
+            if(iArea) {
+                iArea.addEventListener('touchstart', (e) => this.handleStart(e), { passive: false });
+                iArea.addEventListener('touchend', (e) => this.handleEnd(e), { passive: false });
             }
             window.addEventListener('resize', this.handleResize.bind(this));
 
@@ -566,62 +575,64 @@ const CubeTimerApp = {
             this.bindModal('sessionOverlay', 'closeSessionBtn');
             this.bindModal('mbfScrambleOverlay', 'closeMbfBtn');
             this.bindModal('statsOverlay', 'closeStatsBtn');
-            this.bindModal('settingsOverlay', 'closeSettingsBtn');
+            
+            // [FIX] Settings Modal Logic - Special handling for animation classes
+            const sOv = document.getElementById('settingsOverlay');
+            if(sOv) sOv.addEventListener('click', (e) => { if(e.target === sOv) U.closeSettingsModal(); });
+            const sCl = document.getElementById('closeSettingsBtn');
+            if(sCl) sCl.addEventListener('click', () => U.closeSettingsModal());
+
             this.bindModal('avgShareOverlay', 'closeShareBtn');
             this.bindModal('modalOverlay', 'closeDetailBtn');
             this.bindModal('updateLogOverlay', 'closeUpdateLogBtn');
 
-            // Open Modals
-            add('btToggleBtn', 'click', () => U.openModal('btOverlay'));
-            add('settingsBtn', 'click', () => U.openModal('settingsOverlay'));
-            add('mobSettingsBtn', 'click', () => U.openModal('settingsOverlay'));
-            add('sessionSelectBtn', 'click', () => { U.openModal('sessionOverlay'); this.renderSessionList(); });
-            add('moreStatsBtn', 'click', () => U.showExtendedStats());
-            add('clearHistoryBtn', 'click', () => U.clearHistory());
+            safeAdd('btToggleBtn', 'click', () => U.openModal('btOverlay'));
+            safeAdd('backupBtn', 'click', CubeTimerApp.storage.export);
+            safeAdd('restoreBtn', 'click', () => { const el = document.getElementById('importInput'); if(el) el.click(); });
+            const imp = document.getElementById('importInput');
+            if(imp) imp.addEventListener('change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
+            
+            // [FIX] Explicit Settings Open Handlers
+            safeAdd('settingsBtn', 'click', () => U.openSettingsModal());
+            safeAdd('mobSettingsBtn', 'click', () => U.openSettingsModal());
 
-            // Backup/Restore
-            add('backupBtn', 'click', CubeTimerApp.storage.export);
-            add('restoreBtn', 'click', () => { const el = document.getElementById('importInput'); if(el) el.click(); });
-            add('mobBackupBtn', 'click', CubeTimerApp.storage.export);
-            add('mobRestoreBtn', 'click', () => { const el = document.getElementById('importInput'); if(el) el.click(); });
-            add('importInput', 'change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
-
-            // Actions
-            add('btConnectBtn', 'click', () => CubeTimerApp.bluetooth.connect());
-            add('btDisconnectBtn', 'click', () => CubeTimerApp.bluetooth.disconnect());
-            add('addSessionBtn', 'click', () => this.createNewSession());
-            add('genMbfBtn', 'click', () => U.generateMbfScrambles());
-            add('copyMbfBtn', 'click', () => U.copyMbfText());
-            add('copyShareBtn', 'click', () => U.copyShareText());
-            add('shareSingleBtn', 'click', () => U.openSingleShare());
-            add('useScrambleBtn', 'click', () => U.useThisScramble());
-            add('plus2Btn', 'click', () => U.togglePenalty('+2'));
-            add('dnfBtn', 'click', () => U.togglePenalty('DNF'));
+            safeAdd('btConnectBtn', 'click', () => CubeTimerApp.bluetooth.connect());
+            safeAdd('btDisconnectBtn', 'click', () => CubeTimerApp.bluetooth.disconnect());
+            safeAdd('addSessionBtn', 'click', () => this.createNewSession());
+            safeAdd('genMbfBtn', 'click', () => U.generateMbfScrambles());
+            safeAdd('copyMbfBtn', 'click', () => U.copyMbfText());
+            safeAdd('copyShareBtn', 'click', () => U.copyShareText());
+            safeAdd('shareSingleBtn', 'click', () => U.openSingleShare());
+            safeAdd('useScrambleBtn', 'click', () => U.useThisScramble());
+            safeAdd('moreStatsBtn', 'click', () => U.showExtendedStats());
+            safeAdd('clearHistoryBtn', 'click', () => U.clearHistory());
+            safeAdd('sessionSelectBtn', 'click', () => { U.openModal('sessionOverlay'); this.renderSessionList(); });
 
             // Settings Inputs
-            add('darkModeToggle', 'change', (e) => U.toggleDarkMode(e.target));
-            add('wakeLockToggle', 'change', (e) => U.toggleWakeLock(e.target));
-            add('inspectionToggle', 'change', (e) => U.toggleInspection(e.target));
-            add('holdDurationSlider', 'input', (e) => U.updateHoldDuration(e.target.value));
-            add('avgModeToggle', 'change', (e) => { CubeTimerApp.state.isAo5Mode = e.target.checked; this.updateHistory(); CubeTimerApp.storage.save(); });
-            add('precisionToggle', 'change', (e) => { 
+            safeAdd('darkModeToggle', 'change', (e) => U.toggleDarkMode(e.target));
+            safeAdd('wakeLockToggle', 'change', (e) => U.toggleWakeLock(e.target));
+            safeAdd('inspectionToggle', 'change', (e) => U.toggleInspection(e.target));
+            safeAdd('holdDurationSlider', 'input', (e) => U.updateHoldDuration(e.target.value));
+            safeAdd('avgModeToggle', 'change', (e) => { CubeTimerApp.state.isAo5Mode = e.target.checked; this.updateHistory(); CubeTimerApp.storage.save(); });
+            safeAdd('precisionToggle', 'change', (e) => { 
                 CubeTimerApp.state.precision = e.target.checked?3:2; 
                 this.updateHistory(); 
-                const tEl = document.getElementById('timer');
-                if(tEl) tEl.innerText = (0).toFixed(CubeTimerApp.state.precision); 
+                const t = document.getElementById('timer');
+                if(t) t.innerText = (0).toFixed(CubeTimerApp.state.precision); 
                 CubeTimerApp.storage.save(); 
             });
-            add('manualEntryToggle', 'change', (e) => { 
+            safeAdd('manualEntryToggle', 'change', (e) => { 
                 CubeTimerApp.state.isManualMode = e.target.checked; 
-                const tEl = document.getElementById('timer');
-                const mEl = document.getElementById('manualInput');
-                const sEl = document.getElementById('statusHint');
-                if(tEl) tEl.classList.toggle('hidden', CubeTimerApp.state.isManualMode);
-                if(mEl) mEl.classList.toggle('hidden', !CubeTimerApp.state.isManualMode);
-                if(sEl) sEl.innerText = CubeTimerApp.state.isManualMode ? "TYPE TIME & ENTER" : "HOLD TO READY";
+                const t = document.getElementById('timer');
+                const m = document.getElementById('manualInput');
+                const s = document.getElementById('statusHint');
+                if(t) t.classList.toggle('hidden', CubeTimerApp.state.isManualMode);
+                if(m) m.classList.toggle('hidden', !CubeTimerApp.state.isManualMode);
+                if(s) s.innerText = CubeTimerApp.state.isManualMode ? "TYPE TIME & ENTER" : "HOLD TO READY";
             });
+            safeAdd('mobBackupBtn', 'click', CubeTimerApp.storage.export);
+            safeAdd('mobRestoreBtn', 'click', () => { const el = document.getElementById('importInput'); if(el) el.click(); });
 
-            // Delegated Events
             const catTabs = document.getElementById('categoryTabs');
             if(catTabs) catTabs.addEventListener('click', (e) => {
                 const btn = e.target.closest('.category-btn');
@@ -633,35 +644,36 @@ const CubeTimerApp = {
                     if(tab) this.changeEvent(tab.dataset.event);
                 });
             });
-            const sessList = document.getElementById('sessionList');
-            if(sessList) sessList.addEventListener('click', this.handleSessionListClick.bind(this));
+            const sList = document.getElementById('sessionList');
+            if(sList) sList.addEventListener('click', this.handleSessionListClick.bind(this));
             
-            const histList = document.getElementById('historyList');
-            if(histList) {
-                histList.addEventListener('click', this.handleHistoryListClick.bind(this));
-                histList.addEventListener('scroll', this.handleHistoryScroll.bind(this));
+            const hList = document.getElementById('historyList');
+            if(hList) {
+                hList.addEventListener('click', this.handleHistoryListClick.bind(this));
+                hList.addEventListener('scroll', this.handleHistoryScroll.bind(this));
             }
             
-            add('toolsMenuBtn', 'click', (e) => { 
+            safeAdd('plus2Btn', 'click', () => U.togglePenalty('+2'));
+            safeAdd('dnfBtn', 'click', () => U.togglePenalty('DNF'));
+            
+            safeAdd('toolsMenuBtn', 'click', (e) => { 
                 e.stopPropagation(); 
                 const dd = document.getElementById('toolsDropdown');
                 if(dd) dd.classList.toggle('show'); 
             });
-            const toolsDD = document.getElementById('toolsDropdown');
-            if(toolsDD) {
-                toolsDD.addEventListener('click', (e) => {
+            const tDD = document.getElementById('toolsDropdown');
+            if(tDD) {
+                tDD.addEventListener('click', (e) => {
                     const opt = e.target.closest('.tool-option');
                     if(opt) this.selectTool(opt.dataset.tool);
                 });
             }
-            window.addEventListener('click', () => { 
-                if(toolsDD) toolsDD.classList.remove('show'); 
-            });
+            window.addEventListener('click', () => { if(tDD) tDD.classList.remove('show'); });
 
-            add('mob-tab-timer', 'click', () => this.switchMobileTab('timer'));
-            add('mob-tab-history', 'click', () => this.switchMobileTab('history'));
-            add('primaryAvgBadge', 'click', () => U.openAvgShare('primary'));
-            add('ao12Badge', 'click', () => U.openAvgShare('ao12'));
+            safeAdd('mob-tab-timer', 'click', () => this.switchMobileTab('timer'));
+            safeAdd('mob-tab-history', 'click', () => this.switchMobileTab('history'));
+            safeAdd('primaryAvgBadge', 'click', () => U.openAvgShare('primary'));
+            safeAdd('ao12Badge', 'click', () => U.openAvgShare('ao12'));
         },
 
         bindModal(overlayId, closeBtnId) {
@@ -679,24 +691,24 @@ const CubeTimerApp = {
             if (S.isManualMode || S.isRunning) { if(S.isRunning) CubeTimerApp.timer.stop(); return; }
             if (S.isInspectionMode && S.inspectionState === 'none') return;
             
-            const timerEl = document.getElementById('timer');
-            const statusEl = document.getElementById('statusHint');
+            const tEl = document.getElementById('timer');
+            const sEl = document.getElementById('statusHint');
             
             if (S.isInspectionMode && S.inspectionState === 'inspecting') {
                 if (S.isBtConnected) return;
-                if(timerEl) { timerEl.style.color = '#ef4444'; timerEl.classList.add('holding-status'); }
+                if(tEl) { tEl.style.color = '#ef4444'; tEl.classList.add('holding-status'); }
                 CubeTimerApp.timer.holdTimer = setTimeout(()=> { 
                     S.isReady=true; 
-                    if(timerEl) { timerEl.style.color = '#10b981'; timerEl.classList.replace('holding-status','ready-to-start'); }
-                    if(statusEl) statusEl.innerText="Ready!"; 
+                    if(tEl) { tEl.style.color = '#10b981'; tEl.classList.replace('holding-status','ready-to-start'); }
+                    if(sEl) sEl.innerText="Ready!"; 
                 }, S.holdDuration); 
                 return;
             }
-            if(timerEl) { timerEl.style.color = '#ef4444'; timerEl.classList.add('holding-status'); }
+            if(tEl) { tEl.style.color = '#ef4444'; tEl.classList.add('holding-status'); }
             CubeTimerApp.timer.holdTimer = setTimeout(()=> { 
                 S.isReady=true; 
-                if(timerEl) { timerEl.style.color = '#10b981'; timerEl.classList.replace('holding-status','ready-to-start'); }
-                if(statusEl) statusEl.innerText="Ready!"; 
+                if(tEl) { tEl.style.color = '#10b981'; tEl.classList.replace('holding-status','ready-to-start'); }
+                if(sEl) sEl.innerText="Ready!"; 
             }, S.holdDuration);
         },
 
@@ -718,28 +730,28 @@ const CubeTimerApp = {
             if (!S.isRunning && S.isReady) {
                 CubeTimerApp.timer.start();
             } else {
-                const timerEl = document.getElementById('timer');
-                const statusEl = document.getElementById('statusHint');
-                if(timerEl) { timerEl.style.color = ''; timerEl.classList.remove('holding-status','ready-to-start'); }
+                const tEl = document.getElementById('timer');
+                const sEl = document.getElementById('statusHint');
+                if(tEl) { tEl.style.color = ''; tEl.classList.remove('holding-status','ready-to-start'); }
                 S.isReady = false;
-                if(statusEl) {
-                    if (!S.isInspectionMode || S.inspectionState === 'none') statusEl.innerText = S.isInspectionMode ? "Start Inspection" : "Hold to Ready";
+                if(sEl) {
+                    if (!S.isInspectionMode || S.inspectionState === 'none') sEl.innerText = S.isInspectionMode ? "Start Inspection" : "Hold to Ready";
                 }
-                else if(timerEl) timerEl.style.color = '#ef4444';
+                else if(tEl) tEl.style.color = '#ef4444';
             }
         },
 
         handleKeydown(e) {
             const S = CubeTimerApp.state;
-            const manualInput = document.getElementById('manualInput');
+            const mEl = document.getElementById('manualInput');
             if (S.editingSessionId || (document.activeElement && document.activeElement.tagName === 'INPUT')) {
-                if (e.code === 'Enter' && document.activeElement === manualInput) { /* allowed */ } else { return; }
+                if (e.code === 'Enter' && document.activeElement === mEl) { /* allowed */ } else { return; }
             }
             if (e.code === 'Space' && !e.repeat) { e.preventDefault(); this.handleStart(); }
-            if (S.isManualMode && e.code === 'Enter' && manualInput) {
-                let v = parseFloat(manualInput.value);
+            if (S.isManualMode && e.code === 'Enter' && mEl) {
+                let v = parseFloat(mEl.value);
                 if (v > 0) CubeTimerApp.timer.stop(v * 1000);
-                manualInput.value = "";
+                mEl.value = "";
             }
         },
 
@@ -755,8 +767,8 @@ const CubeTimerApp = {
                 const eventSessions = CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent];
                 eventSessions.forEach(s => s.isActive = (s.id === id));
                 this.renderSessionList(); this.updateHistory(); CubeTimerApp.storage.save();
-                const timerEl = document.getElementById('timer');
-                if(timerEl) timerEl.innerText = (0).toFixed(CubeTimerApp.state.precision);
+                const tEl = document.getElementById('timer');
+                if(tEl) tEl.innerText = (0).toFixed(CubeTimerApp.state.precision);
                 CubeTimerApp.ui.resetPenaltyButtons();
                 CubeTimerApp.utils.closeModal('sessionOverlay');
             }
@@ -808,18 +820,18 @@ const CubeTimerApp = {
             }
         },
         setTimerStatus(status) {
-            const statusEl = document.getElementById('statusHint');
-            const timerEl = document.getElementById('timer');
+            const sEl = document.getElementById('statusHint');
+            const tEl = document.getElementById('timer');
             const hints = {
                 'running': "Timing...",
                 'idle': CubeTimerApp.state.isInspectionMode ? "Start Inspection" : "Hold to Ready",
                 'inspection': "Inspection",
                 'ready': "Ready!"
             };
-            if(statusEl) statusEl.innerText = hints[status] || hints['idle'];
-            if(timerEl) {
-                if(status === 'running') { timerEl.classList.add('text-running'); timerEl.classList.remove('text-ready'); }
-                else timerEl.classList.remove('text-running', 'text-ready');
+            if(sEl) sEl.innerText = hints[status] || hints['idle'];
+            if(tEl) {
+                if(status === 'running') { tEl.classList.add('text-running'); tEl.classList.remove('text-ready'); }
+                else tEl.classList.remove('text-running', 'text-ready');
             }
         },
         resetPenaltyButtons() {
@@ -831,28 +843,28 @@ const CubeTimerApp = {
         updateBTUI(connected) {
             const icon = document.getElementById('btStatusIcon');
             if(icon) icon.classList.replace(connected ? 'disconnected' : 'connected', connected ? 'connected' : 'disconnected');
-            const panel = document.getElementById('btInfoPanel');
-            if(panel) panel.classList.toggle('hidden', !connected);
-            const disBtn = document.getElementById('btDisconnectBtn');
-            if(disBtn) disBtn.classList.toggle('hidden', !connected);
-            const conBtn = document.getElementById('btConnectBtn');
-            if(conBtn) conBtn.classList.toggle('hidden', connected);
+            const pnl = document.getElementById('btInfoPanel');
+            if(pnl) pnl.classList.toggle('hidden', !connected);
+            const dis = document.getElementById('btDisconnectBtn');
+            if(dis) dis.classList.toggle('hidden', !connected);
+            const con = document.getElementById('btConnectBtn');
+            if(con) con.classList.toggle('hidden', connected);
             
             if(connected) {
-                const nameEl = document.getElementById('btDeviceName');
-                const statusEl = document.getElementById('btStatusText');
-                const modalIcon = document.getElementById('btModalIcon');
-                const hint = document.getElementById('statusHint');
+                const nm = document.getElementById('btDeviceName');
+                const st = document.getElementById('btStatusText');
+                const ic = document.getElementById('btModalIcon');
+                const ht = document.getElementById('statusHint');
                 
-                if(nameEl && CubeTimerApp.bluetooth.device) nameEl.innerText = CubeTimerApp.bluetooth.device.name;
-                if(statusEl) statusEl.innerText = "Timer Connected & Ready";
-                if(modalIcon) modalIcon.classList.remove('bt-pulse');
-                if(hint) hint.innerText = "Timer Ready (BT)";
+                if(nm && CubeTimerApp.bluetooth.device) nm.innerText = CubeTimerApp.bluetooth.device.name;
+                if(st) st.innerText = "Timer Connected & Ready";
+                if(ic) ic.classList.remove('bt-pulse');
+                if(ht) ht.innerText = "Timer Ready (BT)";
             } else {
-                const statusEl = document.getElementById('btStatusText');
-                const hint = document.getElementById('statusHint');
-                if(statusEl) statusEl.innerText = "Timer Disconnected";
-                if(hint) hint.innerText = "Hold to Ready";
+                const st = document.getElementById('btStatusText');
+                const ht = document.getElementById('statusHint');
+                if(st) st.innerText = "Timer Disconnected";
+                if(ht) ht.innerText = "Hold to Ready";
             }
         },
         syncSettings(settings) {
@@ -918,13 +930,16 @@ const CubeTimerApp = {
             const scrEl = document.getElementById('scramble');
             const mbfEl = document.getElementById('mbfInputArea');
 
+            // Force visibility toggle directly to ensure init
             if(event === '333mbf') {
                 if(scrEl) scrEl.classList.add('hidden');
                 if(mbfEl) mbfEl.classList.remove('hidden');
             } else {
-                if(scrEl) scrEl.classList.remove('hidden');
+                if(scrEl) {
+                    scrEl.classList.remove('hidden');
+                    CubeTimerApp.scrambler.generate(); // Force generation
+                }
                 if(mbfEl) mbfEl.classList.add('hidden');
-                CubeTimerApp.scrambler.generate();
             }
             this.updateHistory(); 
             const tEl = document.getElementById('timer');
@@ -1129,13 +1144,44 @@ const CubeTimerApp = {
                 window.speechSynthesis.speak(utterance);
             }
         },
+        // [FIX] Open Modal handles specific Settings animation
         openModal(id) { 
             const el = document.getElementById(id); 
-            if(el) { el.classList.add('active'); if(id === 'sessionOverlay') CubeTimerApp.ui.renderSessionList(); }
+            if(el) { 
+                el.classList.add('active'); 
+                if(id === 'settingsOverlay') {
+                    const content = document.getElementById('settingsModal');
+                    if(content) setTimeout(() => content.classList.remove('scale-95', 'opacity-0'), 10);
+                }
+                if(id === 'sessionOverlay') CubeTimerApp.ui.renderSessionList(); 
+            }
         },
+        // [FIX] Specific Settings Close Animation
         closeModal(id) { 
             const el = document.getElementById(id);
-            if(el) el.classList.remove('active'); 
+            if(el) {
+                if(id === 'settingsOverlay') {
+                    // Just removing active instantly for now to keep consistent with other modals, 
+                    // or implement reverse transition if strict fidelity needed. 
+                    // Given previous bugs, simple removal is safer.
+                    el.classList.remove('active');
+                    const content = document.getElementById('settingsModal');
+                    // Reset animation classes so next open works
+                    if(content) content.classList.add('scale-95', 'opacity-0');
+                } else {
+                    el.classList.remove('active');
+                }
+            }
+        },
+        openSettingsModal() { this.openModal('settingsOverlay'); },
+        closeSettingsModal() { 
+            const content = document.getElementById('settingsModal');
+            if(content) content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                const overlay = document.getElementById('settingsOverlay');
+                if(overlay) overlay.classList.remove('active');
+            }, 200);
+            CubeTimerApp.storage.save();
         },
         checkUpdateLog() {
             const saved = localStorage.getItem('appVersion');
