@@ -1,10 +1,9 @@
 /**
  * Cube Timer Application
- * Fixed: Visualizer logic (Reuse existing player instead of recreating)
+ * Fixed: Settings modal logic conflict, Hold duration reset bug
  */
 
 const CubeTimerApp = {
-    // --- State Management ---
     state: {
         solves: [],
         sessions: {},
@@ -19,6 +18,7 @@ const CubeTimerApp = {
         editingSessionId: null,
         activeTool: 'scramble',
         holdDuration: 300,
+        savedHoldDuration: 300, // [NEW] To restore hold time after inspection
         wakeLock: null,
         isWakeLockEnabled: false,
         selectedSolveId: null,
@@ -37,13 +37,12 @@ const CubeTimerApp = {
         isBtConnected: false
     },
 
-    // --- Configuration ---
     config: {
-        appVersion: '1.2.2',
+        appVersion: '1.2.4',
         updateLogs: [
-            "스크램블 이미지 렌더링 방식 최적화 (깜빡임 해결)",
-            "Etc. 종목 시각화 지원",
-            "설정 팝업 및 초기화 버그 수정"
+            "인스펙션 해제 시 홀드 시간 복구 로직 수정",
+            "설정 팝업 이벤트 중복 제거",
+            "스크램블 이미지 엔진 최적화"
         ],
         events: {
             '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -174,34 +173,29 @@ const CubeTimerApp = {
 
                 let res = [];
                 
-                // Logic for scrambles
                 if (event === 'minx') this.generateMinx(res);
                 else if (event === 'clock') this.generateClock(res);
                 else if (event === 'sq1') this.generateSq1(res);
                 else if (['pyra', 'skewb'].includes(event)) this.generatePyraSkewb(res, conf);
                 else this.generateNxN(res, conf, event);
 
-                // Ensure scramble is not empty
                 if (res.length === 0) res.push("R U R' U'");
 
                 const scrambleStr = res.join(event === 'minx' ? "\n" : " ");
                 CubeTimerApp.state.currentScramble = scrambleStr;
 
-                // Update Text UI FIRST
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = scrambleStr;
                 
-                // [FIX] Update Visualizer safely
                 CubeTimerApp.ui.resetPenaltyButtons();
                 if (CubeTimerApp.state.activeTool === 'graph') {
                     CubeTimerApp.ui.renderGraph();
                 } 
                 
-                // Update visualizer even if hidden, so it's ready when switched
                 try {
                     CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
                 } catch(err) {
-                    console.warn("Visualizer Error:", err);
+                    console.warn("Visualizer update pending:", err);
                 }
             } catch (e) {
                 console.error("Scramble Generation Failed:", e);
@@ -313,7 +307,6 @@ const CubeTimerApp = {
         }
     },
 
-    // [FIX] NEW Visualizer Module using Twisty Player
     visualizer: {
         update(puzzleId, scramble) {
             const container = document.getElementById('cubeVisualizer');
@@ -323,21 +316,16 @@ const CubeTimerApp = {
             if(msg) msg.classList.add('hidden');
             container.style.display = 'flex';
 
-            // Check blind event
             if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
                if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
                container.style.display = 'none';
-               // Hide any existing player
                const p = container.querySelector('twisty-player');
                if(p) p.style.display = 'none';
                return;
             }
 
-            // [FIXED] Reuse existing player to prevent flickering and overhead
-            // Do NOT use innerHTML = '' here
             let player = container.querySelector('twisty-player');
             if (!player) {
-                // Only create if it doesn't exist
                 player = document.createElement('twisty-player');
                 player.setAttribute('visualization', '2D');
                 player.setAttribute('background', 'none');
@@ -351,7 +339,6 @@ const CubeTimerApp = {
             player.setAttribute('alg', scramble);
         },
         draw() {
-            // Re-trigger update if tool is switched
             const event = CubeTimerApp.state.currentEvent;
             const conf = CubeTimerApp.config.events[event];
             const scramble = CubeTimerApp.state.currentScramble;
@@ -370,7 +357,6 @@ const CubeTimerApp = {
 
     ui: {
         init() {
-            // Map IDs to DOM Object
             const ids = [
                 'timer', 'scramble', 'mbfInputArea', 'mbfCubeInput', 'manualInput', 'historyList',
                 'solveCount', 'sessionAvg', 'bestSolve', 'labelPrimaryAvg', 'displayPrimaryAvg', 'displayAo12',
@@ -418,8 +404,9 @@ const CubeTimerApp = {
             this.bindModal('mbfScrambleOverlay', 'closeMbfBtn');
             this.bindModal('statsOverlay', 'closeStatsBtn');
             
-            // Settings Modal Logic
+            // [FIX] Settings Modal Logic - Cleaned up to prevent double binding
             const sOv = document.getElementById('settingsOverlay');
+            // Only bind click-outside if not handled by bindModal in a conflicting way (it is safe here as bindModal is generic)
             if(sOv) sOv.addEventListener('click', (e) => { if(e.target === sOv) U.closeSettingsModal(); });
             const sCl = document.getElementById('closeSettingsBtn');
             if(sCl) sCl.addEventListener('click', () => U.closeSettingsModal());
@@ -434,6 +421,7 @@ const CubeTimerApp = {
             const imp = document.getElementById('importInput');
             if(imp) imp.addEventListener('change', (e) => CubeTimerApp.storage.import(e.target.files[0]));
             
+            // Explicit Settings Open Handlers
             safeAdd('settingsBtn', 'click', () => U.openSettingsModal());
             safeAdd('mobSettingsBtn', 'click', () => U.openSettingsModal());
 
@@ -521,7 +509,8 @@ const CubeTimerApp = {
             const overlay = document.getElementById(overlayId);
             const closeBtn = document.getElementById(closeBtnId);
             if(closeBtn) closeBtn.addEventListener('click', () => CubeTimerApp.utils.closeModal(overlayId));
-            if(overlay) overlay.addEventListener('click', (e) => { if(e.target === overlay) CubeTimerApp.utils.closeModal(overlayId); });
+            // Settings overlay handled separately to avoid conflict with animation logic
+            if(overlay && overlayId !== 'settingsOverlay') overlay.addEventListener('click', (e) => { if(e.target === overlay) CubeTimerApp.utils.closeModal(overlayId); });
         },
 
         handleStart(e) {
@@ -1038,16 +1027,23 @@ const CubeTimerApp = {
             CubeTimerApp.storage.save();
         },
         toggleInspection(el) {
-            CubeTimerApp.state.isInspectionMode = el && el.checked;
+            const S = CubeTimerApp.state;
+            S.isInspectionMode = el && el.checked;
             const slider = document.getElementById('holdDurationSlider');
             const container = document.getElementById('holdDurationContainer');
+            
             if (el && el.checked) { 
+                // [FIX] Save current hold duration before overwriting
+                if(S.holdDuration > 100) S.savedHoldDuration = S.holdDuration;
+                
                 this.updateHoldDuration(0.01); 
                 if(slider) { slider.value = 0.01; slider.disabled = true; }
                 if(container) container.classList.add('opacity-50', 'pointer-events-none'); 
             } else { 
-                this.updateHoldDuration(0.3); 
-                if(slider) { slider.value = 0.3; slider.disabled = false; }
+                // [FIX] Restore saved hold duration
+                const restored = S.savedHoldDuration ? S.savedHoldDuration / 1000 : 0.3;
+                this.updateHoldDuration(restored); 
+                if(slider) { slider.value = restored; slider.disabled = false; }
                 if(container) container.classList.remove('opacity-50', 'pointer-events-none'); 
             }
             CubeTimerApp.storage.save();
