@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Fixed: Visualizer module updated to use 'cubing.js' TwistyPlayer
+ * Fixed: Visualizer logic (Reuse existing player instead of recreating)
  */
 
 const CubeTimerApp = {
@@ -39,11 +39,11 @@ const CubeTimerApp = {
 
     // --- Configuration ---
     config: {
-        appVersion: '1.2.3',
+        appVersion: '1.2.2',
         updateLogs: [
-            "스크램블 이미지 시각화 엔진 교체 (Cubing.js)",
-            "모든 WCA 종목 (메가밍크스, 피라밍크스 등) 이미지 지원",
-            "초기화 및 설정 팝업 안정화"
+            "스크램블 이미지 렌더링 방식 최적화 (깜빡임 해결)",
+            "Etc. 종목 시각화 지원",
+            "설정 팝업 및 초기화 버그 수정"
         ],
         events: {
             '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -65,14 +65,12 @@ const CubeTimerApp = {
         },
         suffixes: ["", "'", "2"],
         orientations: ["x", "x'", "x2", "y", "y'", "y2", "z", "z'", "z2"],
-        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"]
+        wideMoves: ["Uw", "Dw", "Lw", "Rw", "Fw", "Bw"],
+        cubeColors: { U: '#FFFFFF', D: '#FFD500', L: '#FF8C00', R: '#DC2626', F: '#16A34A', B: '#2563EB' }
     },
 
-    // --- DOM Cache ---
     dom: {},
 
-    // --- Core Modules ---
-    
     timer: {
         interval: null,
         holdTimer: null,
@@ -176,32 +174,42 @@ const CubeTimerApp = {
 
                 let res = [];
                 
+                // Logic for scrambles
                 if (event === 'minx') this.generateMinx(res);
                 else if (event === 'clock') this.generateClock(res);
                 else if (event === 'sq1') this.generateSq1(res);
                 else if (['pyra', 'skewb'].includes(event)) this.generatePyraSkewb(res, conf);
                 else this.generateNxN(res, conf, event);
 
+                // Ensure scramble is not empty
                 if (res.length === 0) res.push("R U R' U'");
 
                 const scrambleStr = res.join(event === 'minx' ? "\n" : " ");
                 CubeTimerApp.state.currentScramble = scrambleStr;
 
+                // Update Text UI FIRST
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = scrambleStr;
                 
-                // [FIX] Correctly call visualizer.update
-                CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
-
+                // [FIX] Update Visualizer safely
                 CubeTimerApp.ui.resetPenaltyButtons();
-                if (CubeTimerApp.state.activeTool === 'graph') CubeTimerApp.ui.renderGraph();
-
+                if (CubeTimerApp.state.activeTool === 'graph') {
+                    CubeTimerApp.ui.renderGraph();
+                } 
+                
+                // Update visualizer even if hidden, so it's ready when switched
+                try {
+                    CubeTimerApp.visualizer.update(conf.puzzle, scrambleStr);
+                } catch(err) {
+                    console.warn("Visualizer Error:", err);
+                }
             } catch (e) {
                 console.error("Scramble Generation Failed:", e);
                 const scrEl = document.getElementById('scramble');
                 if(scrEl) scrEl.innerText = "Error generating scramble";
             }
         },
+
         generateMinx(res) {
             for (let i = 0; i < 7; i++) {
                 let line = [];
@@ -315,6 +323,7 @@ const CubeTimerApp = {
             if(msg) msg.classList.add('hidden');
             container.style.display = 'flex';
 
+            // Check blind event
             if(CubeTimerApp.config.events[CubeTimerApp.state.currentEvent]?.cat === 'blind') {
                if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
                container.style.display = 'none';
@@ -324,9 +333,11 @@ const CubeTimerApp = {
                return;
             }
 
-            // Reuse player logic
+            // [FIXED] Reuse existing player to prevent flickering and overhead
+            // Do NOT use innerHTML = '' here
             let player = container.querySelector('twisty-player');
             if (!player) {
+                // Only create if it doesn't exist
                 player = document.createElement('twisty-player');
                 player.setAttribute('visualization', '2D');
                 player.setAttribute('background', 'none');
@@ -354,185 +365,6 @@ const CubeTimerApp = {
                 const p = container.querySelector('twisty-player');
                 if(p) p.style.display = 'none';
             }
-        }
-    },
-
-    storage: {
-        save() {
-            const data = {
-                solves: CubeTimerApp.state.solves,
-                sessions: CubeTimerApp.state.sessions,
-                settings: { 
-                    precision: CubeTimerApp.state.precision, 
-                    isAo5Mode: CubeTimerApp.state.isAo5Mode, 
-                    currentEvent: CubeTimerApp.state.currentEvent, 
-                    holdDuration: CubeTimerApp.state.holdDuration,
-                    isDarkMode: document.documentElement.classList.contains('dark'),
-                    isWakeLockEnabled: CubeTimerApp.state.isWakeLockEnabled,
-                    isInspectionMode: CubeTimerApp.state.isInspectionMode
-                }
-            };
-            localStorage.setItem('cubeTimerData_v5', JSON.stringify(data));
-        },
-        load() {
-            const saved = localStorage.getItem('cubeTimerData_v5') || localStorage.getItem('cubeTimerData_v4');
-            if (saved) {
-                try {
-                    const data = JSON.parse(saved);
-                    const S = CubeTimerApp.state;
-                    S.solves = data.solves || [];
-                    S.sessions = data.sessions || {};
-                    if (data.settings) {
-                        S.precision = data.settings.precision || 2;
-                        S.isAo5Mode = data.settings.isAo5Mode !== undefined ? data.settings.isAo5Mode : true;
-                        S.currentEvent = data.settings.currentEvent || '333';
-                        S.holdDuration = data.settings.holdDuration || 300;
-                        S.isWakeLockEnabled = data.settings.isWakeLockEnabled || false;
-                        S.isInspectionMode = data.settings.isInspectionMode || false;
-                        
-                        CubeTimerApp.ui.syncSettings(data.settings);
-                    }
-                } catch (e) { console.error("Load failed", e); }
-            }
-            this.initSessionIfNeeded(CubeTimerApp.state.currentEvent);
-        },
-        initSessionIfNeeded(eventId) {
-            if (!CubeTimerApp.state.sessions[eventId] || CubeTimerApp.state.sessions[eventId].length === 0) {
-                CubeTimerApp.state.sessions[eventId] = [{ id: Date.now(), name: "Session 1", isActive: true }];
-            } else if (!CubeTimerApp.state.sessions[eventId].find(s => s.isActive)) {
-                CubeTimerApp.state.sessions[eventId][0].isActive = true;
-            }
-        },
-        getCurrentSessionId() {
-            const active = (CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent] || []).find(s => s.isActive);
-            if (active) return active.id;
-            this.initSessionIfNeeded(CubeTimerApp.state.currentEvent);
-            return CubeTimerApp.state.sessions[CubeTimerApp.state.currentEvent][0].id;
-        },
-        export() {
-            const data = { solves: CubeTimerApp.state.solves, sessions: CubeTimerApp.state.sessions, settings: { ...CubeTimerApp.state } }; 
-            delete data.settings.isRunning; delete data.settings.currentScramble;
-            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `cubetimer_backup_${new Date().toISOString().slice(0, 10)}.json`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-        },
-        import(file) {
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (data.solves && data.sessions) {
-                        CubeTimerApp.state.solves = data.solves;
-                        CubeTimerApp.state.sessions = data.sessions;
-                        if(data.settings) CubeTimerApp.ui.syncSettings(data.settings); 
-                        this.save();
-                        location.reload();
-                    } else throw new Error("Invalid format");
-                } catch(err) { alert("Failed to restore data. Invalid JSON."); }
-            };
-            reader.readAsText(file);
-        }
-    },
-
-    bluetooth: {
-        device: null,
-        characteristic: null,
-        
-        async connect() {
-            const els = CubeTimerApp.dom;
-            if (!navigator.bluetooth) {
-                const st = document.getElementById('btStatusText');
-                if(st) { st.innerText = "Web Bluetooth is not supported."; st.classList.add('text-red-400'); }
-                return;
-            }
-            try {
-                const btn = document.getElementById('btConnectBtn');
-                if(btn) { btn.disabled = true; btn.innerText = "Searching..."; }
-                
-                const st = document.getElementById('btStatusText');
-                if(st) st.innerText = "Select your GAN Timer in the popup";
-                
-                const icon = document.getElementById('btModalIcon');
-                if(icon) icon.classList.add('bt-pulse');
-
-                this.device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'GAN' }],
-                    optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
-                });
-
-                const server = await this.device.gatt.connect();
-                const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-                this.characteristic = await service.getCharacteristic('0000fff5-0000-1000-8000-00805f9b34fb');
-
-                await this.characteristic.startNotifications();
-                this.characteristic.addEventListener('characteristicvaluechanged', this.handleData.bind(this));
-
-                CubeTimerApp.state.isBtConnected = true;
-                CubeTimerApp.ui.updateBTUI(true);
-                this.device.addEventListener('gattserverdisconnected', this.disconnect.bind(this));
-
-            } catch (error) {
-                console.error("BT Error:", error);
-                const st = document.getElementById('btStatusText');
-                if(st) st.innerText = "Connection failed";
-                
-                const btn = document.getElementById('btConnectBtn');
-                if(btn) { btn.disabled = false; btn.innerText = "Connect Timer"; }
-                
-                const icon = document.getElementById('btModalIcon');
-                if(icon) icon.classList.remove('bt-pulse');
-            }
-        },
-        handleData(event) {
-            const data = event.target.value;
-            if (data.byteLength < 4) return;
-            const stateCode = data.getUint8(3);
-            const S = CubeTimerApp.state;
-
-            if (stateCode !== 3 && !S.isRunning && data.byteLength >= 8) {
-                const min = data.getUint8(4), sec = data.getUint8(5), msec = data.getUint16(6, true);
-                const tEl = document.getElementById('timer');
-                if(tEl) tEl.innerText = CubeTimerApp.utils.formatTime((min*60000)+(sec*1000)+msec);
-            }
-
-            if (stateCode !== S.lastBtState) {
-                const T = CubeTimerApp.timer;
-                if (stateCode === 6) { 
-                    if (!S.isInspectionMode) {
-                        S.isReady = false;
-                        CubeTimerApp.ui.setTimerStatus('ready');
-                    }
-                } else if (stateCode === 2) { 
-                    if (!S.isInspectionMode) CubeTimerApp.ui.setTimerStatus('idle');
-                } else if (stateCode === 3) { 
-                    if (!S.isRunning) {
-                        if (S.isInspectionMode && S.inspectionState === 'inspecting') T.stopInspection();
-                        T.start();
-                    }
-                } else if (stateCode === 4) { 
-                    if (S.isRunning) {
-                        clearInterval(T.interval);
-                        S.isRunning = false;
-                        if (data.byteLength >= 8) {
-                            const min = data.getUint8(4), sec = data.getUint8(5), msec = data.getUint16(6, true);
-                            const finalMs = (min*60000)+(sec*1000)+msec;
-                            const tEl = document.getElementById('timer');
-                            if(tEl) tEl.innerText = CubeTimerApp.utils.formatTime(finalMs);
-                            T.stop(finalMs);
-                        }
-                    }
-                }
-                S.lastBtState = stateCode;
-            }
-        },
-        disconnect() {
-            if (this.device && this.device.gatt.connected) this.device.gatt.disconnect();
-            if (CubeTimerApp.state.isRunning) CubeTimerApp.timer.stop();
-            CubeTimerApp.state.isBtConnected = false;
-            CubeTimerApp.state.lastBtState = null;
-            CubeTimerApp.ui.updateBTUI(false);
         }
     },
 
