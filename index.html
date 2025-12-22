@@ -11,31 +11,27 @@
             theme: {
                 extend: {
                     colors: {
-                        slate: {
-                            850: '#1e293b', 
-                            900: '#0f172a',
-                            950: '#020617',
-                        }
+                        slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' }
                     },
-                    screens: {
-                        'md': '768px' // iPad mini portrait width
-                    }
+                    screens: { 'md': '768px' }
                 }
             }
         }
     </script>
     
-    <!-- [핵심 수정] 큐브 시각화 라이브러리 경로 수정 (/v0/ 추가) -->
-    <script src="https://cdn.cubing.net/v0/js/cubing/twisty" type="module"></script>
+    <!-- [수정됨] 라이브러리를 가져온 뒤, 브라우저에 확실하게 등록합니다. -->
+    <script type="module">
+        import { TwistyPlayer } from "https://cdn.cubing.net/v0/js/cubing/twisty";
+        if (!customElements.get('twisty-player')) {
+            customElements.define('twisty-player', TwistyPlayer);
+        }
+    </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Mobile Bottom Nav Safe Area */
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
-        
-        /* Twisty Player 스타일 */
         twisty-player {
             width: 100%;
             height: 100%;
