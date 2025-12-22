@@ -1,6 +1,6 @@
 /**
  * Cube Timer Application
- * Visualizer Updated to match Test Tool logic
+ * Visualizer Updated: Fixed rendering crash by forcing re-creation of player
  */
 
 // 1. App State
@@ -39,11 +39,10 @@ const State = {
 
 // 2. Configuration
 const Config = {
-    appVersion: '1.4.2',
+    appVersion: '1.4.4',
     updateLogs: [
-        "스크램블 이미지 엔진 교체",
-        "TwistyPlayer 직접 제어 방식 적용",
-        "다양한 퍼즐 시각화 안정성 향상"
+        "스크램블 이미지 렌더링 오류 수정",
+        "퍼즐 전환 시 안정성 강화"
     ],
     events: {
         '333': { moves: ["U","D","L","R","F","B"], len: 21, cat: 'standard', puzzle: '3x3x3' },
@@ -571,13 +570,13 @@ const Storage = {
     }
 };
 
-// 8. Visualizer Module (Updated with Test Tool logic)
+// 8. Visualizer Module (FIXED: Re-create player to prevent renderer crashes)
 const Visualizer = {
     update(puzzleId, scramble) {
         const container = Dom.get('cubeVisualizer');
         if(!container) return;
         
-        // Handle Blind events (Keep existing logic: hide visualizer)
+        // Handle Blind events (hide visualizer)
         const msg = Dom.get('noVisualizerMsg');
         if(Config.events[State.currentEvent]?.cat === 'blind') {
            if(msg) { msg.classList.remove('hidden'); msg.innerText = "Scramble images disabled for Blind"; }
@@ -588,13 +587,19 @@ const Visualizer = {
         if(msg) msg.classList.add('hidden');
         container.style.display = 'flex';
 
-        // Check if library is loaded (exposed in index.html)
-        if (!window.TwistyPlayer) return;
+        // Wait for library
+        if (!window.TwistyPlayer) {
+            console.log("TwistyPlayer not loaded yet, retrying in 500ms...");
+            setTimeout(() => this.update(puzzleId, scramble), 500);
+            return;
+        }
 
-        let player = container.querySelector('twisty-player');
-        if (!player) {
-            // Test Tool Logic: Use constructor
-            player = new window.TwistyPlayer({
+        // [핵심 수정] 기존 플레이어를 재사용하지 않고 항상 새로 생성하여
+        // "Bad position" 및 "TypeError: children undefined" 오류 방지
+        container.innerHTML = ''; 
+
+        try {
+            const player = new window.TwistyPlayer({
                 puzzle: puzzleId,
                 alg: scramble,
                 visualization: '2D',
@@ -602,16 +607,14 @@ const Visualizer = {
                 controlPanel: 'none'
             });
             
-            // Apply styles
+            // 스타일 적용
             player.style.width = "100%";
             player.style.height = "100%";
-            player.style.pointerEvents = "none"; // Prevent interaction stealing focus
+            player.style.pointerEvents = "none"; // 터치/드래그 간섭 방지
             
             container.appendChild(player);
-        } else {
-            // Test Tool Logic: Update properties directly
-            player.puzzle = puzzleId;
-            player.alg = scramble;
+        } catch(e) {
+            console.error("TwistyPlayer init failed:", e);
         }
     },
     draw() {
