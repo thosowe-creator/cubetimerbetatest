@@ -912,14 +912,15 @@ function generateScramble() {
         currentScramble = res.join(" ");
         
     } else if (currentEvent === 'sq1') {
-        // Square-1 Simulation Logic (Truncated for brevity, same as before)
-        // ... (Logic remains identical to previous version, ensuring standard randomness)
-        let topCuts = [true, false, true, true, false, true, true, false, true, true, false, true];
-        let botCuts = [true, false, true, true, false, true, true, false, true, true, false, true]; 
+        // Square-1 Scramble Logic (Vanilla JS Implementation)
+        // 0=12 o'clock, 6=6 o'clock. Right half = 0..5, Left half = 6..11
+        let topCuts = [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1]; // Initial Cube Shape
+        let botCuts = [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1]; 
         
         let movesCount = 0;
         let scrambleOps = [];
         
+        // Rotates array to the right (Clockwise layer movement)
         const rotateArray = (arr, amt) => {
             const n = 12;
             let amount = amt % n;
@@ -928,24 +929,35 @@ function generateScramble() {
             arr.unshift(...spliced);
         };
 
-        while (movesCount < 12) {
+        while (movesCount < 14) { // Standard length usually ~12-16
             let u = Math.floor(Math.random() * 12) - 5;
             let d = Math.floor(Math.random() * 12) - 5;
-            if (u === 0 && d === 0) continue;
+            
+            // Temporary arrays to test rotation
             let nextTop = [...topCuts];
             let nextBot = [...botCuts];
             rotateArray(nextTop, u);
             rotateArray(nextBot, d);
             
-            if (nextTop[0] && nextTop[6] && nextBot[0] && nextBot[6]) {
+            // Check if cut is possible (Line at 0 and 6 must be 1)
+            if (nextTop[0] === 1 && nextTop[6] === 1 && nextBot[0] === 1 && nextBot[6] === 1) {
+                if (u === 0 && d === 0 && scrambleOps.length > 0) continue; // Avoid empty moves unless start
+                
                 scrambleOps.push(`(${u},${d})`);
-                let topRight = nextTop.slice(6, 12);
-                let botRight = nextBot.slice(6, 12);
-                let newTop = [...nextTop.slice(0, 6), ...botRight];
-                let newBot = [...nextBot.slice(0, 6), ...topRight];
-                topCuts = newTop;
-                botCuts = newBot;
                 scrambleOps.push("/");
+                
+                // Perform Slash: Swap RIGHT halves (0..5)
+                // New Top = Bot(0..5) + Top(6..11)
+                // New Bot = Top(0..5) + Bot(6..11)
+                
+                let topRight = nextTop.slice(0, 6);
+                let topLeft = nextTop.slice(6, 12);
+                let botRight = nextBot.slice(0, 6);
+                let botLeft = nextBot.slice(6, 12);
+                
+                topCuts = [...botRight, ...topLeft];
+                botCuts = [...topRight, ...botLeft];
+                
                 movesCount++;
             }
         }
