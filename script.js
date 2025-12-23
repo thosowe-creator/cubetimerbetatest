@@ -1,6 +1,6 @@
 /**
  * Cube Timer Logic
- * Version: 1.2.2 (Graph Reverted to Simple Style)
+ * Version: 1.2.2 (Graph Reverted to Simple Style + Verbose Format)
  */
 
 // ==========================================
