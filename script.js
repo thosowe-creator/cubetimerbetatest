@@ -1,6 +1,6 @@
 /**
  * Cube Timer Logic
- * Version: 1.2.2 (Graph Reverted to Simple Style + Verbose Format)
+ * Version: 1.2.3 (Mobile Touch Fix & Format Preserved)
  */
 
 // ==========================================
@@ -53,8 +53,13 @@ let displayedSolvesCount = 50;
 const SOLVES_BATCH_SIZE = 50;
 
 // App Info
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.3';
 const UPDATE_HISTORY = [
+    {
+        date: "2025.12.23",
+        ver: "V1.2.3",
+        content: ["모바일 스크롤 및 클릭 문제 수정", "타이머 폰트 복구"]
+    },
     {
         date: "2025.12.23",
         ver: "V1.2.2",
@@ -263,10 +268,16 @@ function handleStart(e) {
     }
 
     if (e && e.cancelable) {
-        e.preventDefault();
+        // [FIXED] Only prevent default if it's NOT a touch event on interactive elements
+        // Actually, preventing default on touchstart blocks clicking buttons inside it if logic is wrong.
+        // We removed preventDefault() here to allow scrolling and clicking.
+        // But we need to prevent default ONLY if we are actually starting the timer logic (holding).
+        // e.preventDefault(); 
     }
+    
     if (isManualMode || isRunning) {
         if (isRunning) stopTimer();
+        if (e && e.cancelable) e.preventDefault(); // Prevent default only when stopping/manual
         return;
     }
 
@@ -274,11 +285,15 @@ function handleStart(e) {
         if (inspectionState === 'none') return;
         if (inspectionState === 'inspecting') {
             if (isBtConnected) return;
+            if (e && e.cancelable) e.preventDefault();
             prepareForStart();
             return;
         }
     }
 
+    // Only prevent default and start holding if we are not scrolling (tough to distinguish)
+    // For now, removing preventDefault allows scrolling. 
+    // Holding for timer will still work as long as touch remains.
     prepareForStart();
 }
 
@@ -305,9 +320,9 @@ function handleEnd(e) {
         return;
     }
 
-    if (e && e.cancelable) {
-        e.preventDefault();
-    }
+    // [FIXED] Removed unconditional preventDefault to allow clicks/scrolls to finish
+    // if (e && e.cancelable) { e.preventDefault(); }
+    
     clearTimeout(holdTimer);
 
     if (isManualMode) {
